@@ -66,28 +66,16 @@
         </div>
         <div class="actions-sub">
             <button id="laneCountButton" class="secondary">レーン人数確認</button>
-            <button id="jsonExportButton">JSON出力</button>
+            <button id="jsonExportButton" class="secondary">JSON出力</button>
             <button id="jsonImportButton" class="secondary">JSON読み込み</button>
         </div>
         <div id="message" class="message"></div>
     </section>
 
-    <section class="json-section">
-        <p class="json-note">
-            JSON入出力用エリアです。<br>
-            「JSON出力」でここに表示された内容をコピーしてテキストファイル等に保存しておき、<br>
-            使うときに貼り付けて「JSON読み込み」を押してください。
-        </p>
-        <div class="json-area-wrapper">
-            <textarea id="jsonArea" placeholder="ここにJSONを表示 / 貼り付けます"></textarea>
-        </div>
-    </section>
-
     <section id="laneCountSection" class="lane-count hidden">
         <h2>レーン人数</h2>
         <p class="lane-count-note">
-            ※ 第1〜第5希望のどこかに含まれている人数です（1人が複数順位に書いていても1カウント）。
-        </p>
+            ※ 第1〜第5希望のどこかに含まれている人数です（1人が複数順位に書いていても1カウント）。</p>
         <ul id="laneCountList"></ul>
     </section>
 
@@ -109,6 +97,19 @@
             評価スコア（小さいほどバランスが良い）: <span id="scoreValue"></span>
         </p>
     </section>
+
+    <!-- JSONエリア（結果の下・一番下） -->
+    <section class="json-section">
+        <p class="json-note">
+            JSON入出力用エリアです。<br>
+            「JSON出力」でここに表示された内容をコピーしてテキストファイル等に保存しておき、<br>
+            使うときに貼り付けて「JSON読み込み」を押してください。
+        </p>
+        <div class="json-area-wrapper">
+            <textarea id="jsonArea" placeholder="ここにJSONを表示 / 貼り付けます"></textarea>
+        </div>
+    </section>
+
 </div>
 </body>
 </html>
