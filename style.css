@@ -225,6 +225,10 @@ button.secondary:hover {
     margin-right: 4px;
 }
 
+.team-name {
+    margin-right: 4px;
+}
+
 .team-rank {
     font-size: 12px;
     opacity: 0.95;
@@ -348,4 +352,69 @@ button.secondary:hover {
 }
 .pref-select-SUPPORT {
     color: #f9a8d4;
+}
+
+/* 詳細設定エリア */
+.advanced-settings {
+    margin-top: 12px;
+    background: #111827;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    border: 1px solid #1f2937;
+}
+
+.advanced-grid {
+    margin-top: 6px;
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.advanced-block {
+    flex: 1 1 260px;
+    background: #030712;
+    border-radius: 8px;
+    padding: 8px;
+    border: 1px solid #1f2937;
+}
+
+.advanced-block h3 {
+    margin: 0 0 4px;
+    font-size: 13px;
+}
+
+.advanced-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.advanced-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.advanced-row label {
+    font-size: 11px;
+    opacity: 0.8;
+}
+
+.advanced-row select {
+    width: auto;
+    min-width: 70px;
+}
+
+.advanced-row span {
+    font-size: 11px;
+    opacity: 0.8;
+}
+
+.advanced-note {
+    margin: 4px 0 0;
+    font-size: 11px;
+    color: #9ca3af;
 }
