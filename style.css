@@ -126,6 +126,19 @@ button.secondary:hover {
     background: #6b7280;
 }
 
+/* トグルボタンが「表示中」のときの見た目 */
+button.secondary.toggle-active {
+    background: #6b7280;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.7);
+}
+
+
+button.small {
+    padding: 4px 8px;
+    font-size: 11px;
+    border-radius: 999px;
+}
+
 .message {
     min-height: 18px;
     font-size: 13px;
@@ -139,7 +152,7 @@ button.secondary:hover {
     color: #6ee7b7;
 }
 
-/* JSON セクション */
+/* JSON セクション（10人入力用） */
 .json-section {
     margin-top: 12px;
 }
@@ -254,11 +267,21 @@ button.secondary:hover {
     display: none;
 }
 
-/* 名前 + 一括ランク */
+/* 名前 + 一括ランク + プレイヤー選択 */
 .name-cell {
     display: flex;
     flex-direction: column;
     gap: 4px;
+}
+
+.registry-row {
+    display: flex;
+}
+
+.player-registry-select {
+    width: 100%;
+    font-size: 11px;
+    padding: 3px 6px;
 }
 
 .bulk-rank-row {
@@ -296,8 +319,10 @@ button.secondary:hover {
     background: #111827;
     padding: 10px 12px;
     border-radius: 8px;
-    font-size: 13px;
+    font-size: 12px;
+    border: 1px solid #1f2937;  /* 詳細設定・プレイヤーリストと合わせる */
 }
+
 
 .lane-count-note {
     margin: 0 0 6px;
@@ -417,4 +442,116 @@ button.secondary:hover {
     margin: 4px 0 0;
     font-size: 11px;
     color: #9ca3af;
+}
+
+/* プレイヤーリストエリア */
+.player-registry {
+    margin-top: 16px;
+    background: #111827;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    border: 1px solid #1f2937;
+}
+
+.player-registry-note {
+    margin: 0 0 4px;
+    font-size: 11px;
+    color: #9ca3af;
+}
+
+.player-registry-form {
+    margin-top: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+
+
+
+.player-registry-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.player-registry-row label {
+    width: 70px;
+    font-size: 12px;
+}
+
+/* プレイヤーリストの名前・備考 */
+/* 全体の約半分くらいの長さにする */
+.player-registry-row input[type="text"] {
+    flex: 0 0 50%;     /* 横幅を約半分に固定 */
+    max-width: 632px;  /* 広い画面でも伸びすぎないように */
+}
+
+/* ランク行全体のコンテナ */
+.player-registry-row-ranks {
+    align-items: flex-start;
+}
+
+/* 「ランク」の文字を TOP/JG ではなく、セレクトの列と高さをそろえる */
+.player-registry-row-ranks label {
+    padding-top: 18px;   /* セレクトボックスの高さに合わせて少し下げる */
+}
+
+
+
+/* レーンランク（TOP/JG/MID/ADC/SUP）が改行されないよう少し広めにする */
+.player-registry-lane {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 120px;
+}
+
+.player-registry-lane span {
+    font-size: 11px;
+    opacity: 0.8;
+    white-space: nowrap;
+}
+
+
+
+
+
+.player-registry-list {
+    margin-top: 10px;
+}
+
+.player-registry-list table {
+    font-size: 12px;
+}
+
+.player-registry-list th,
+.player-registry-list td {
+    white-space: nowrap;
+}
+
+.player-registry-json {
+    margin-top: 10px;
+}
+
+#playerJsonArea {
+    width: 100%;
+    min-height: 100px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid #4b5563;
+    background: #030712;
+    color: #e5e7eb;
+    font-size: 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    resize: vertical;
+}
+
+.player-registry-json-buttons {
+    margin-top: 4px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
 }
