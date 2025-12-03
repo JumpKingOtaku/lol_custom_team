@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>LoL カスタム チーム分けツール</title>
+    <link rel="stylesheet" href="style.css">
+    <script defer src="script.js"></script>
+</head>
+<body>
+<div class="container">
+    <h1>LoL カスタム チーム分けツール</h1>
+
+    <section class="description">
+        <p>
+            10人のプレイヤー情報（名前・レーンごとのランク・希望レーン・備考）を入力して、
+            Blue / Red のチームをレーン指定で自動生成します。
+        </p>
+        <ul>
+            <li>各プレイヤーのレーンごとのランク（TOP / JG / MID / ADC / SUP）を指定</li>
+            <li>希望レーンに入っているレーンにしか配置されません</li>
+            <li>対面レーンのランク差を最小化</li>
+            <li>チーム平均ランクも近づける</li>
+        </ul>
+        <p>
+            ※ 第1〜第5希望のどこにも入っていないレーンには絶対に配置されません。<br>
+            ※ 各レーンに最低2人は希望者がいるようにしてください（いないと組めません）。<br>
+            ※ 「チーム生成」ボタンごとに重み付けが異なり、押すたびに条件を満たしつつランダムに再生成されます。
+        </p>
+    </section>
+
+    <section class="players">
+        <h2>プレイヤー情報</h2>
+        <div class="table-wrapper">
+            <table id="playerTable">
+                <thead>
+                <tr>
+                    <th>#</th>
+                    <th>名前 / 一括ランク</th>
+                    <th>TOPランク</th>
+                    <th>JGランク</th>
+                    <th>MIDランク</th>
+                    <th>ADCランク</th>
+                    <th>SUPランク</th>
+                    <th>第1希望</th>
+                    <th>第2希望</th>
+                    <th>第3希望</th>
+                    <th>第4希望</th>
+                    <th>第5希望</th>
+                    <th>備考</th>
+                </tr>
+                </thead>
+                <tbody id="playerTableBody">
+                <!-- script.js で 10行分を生成 -->
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="actions">
+        <div class="actions-main">
+            <button id="btnNormal">通常生成</button>
+            <button id="btnPref">希望レーン重視</button>
+            <button id="btnLane">対面ランク重視</button>
+            <button id="btnAvg">チーム平均重視</button>
+            <button id="btnRandom" class="secondary">希望レーン内で完全ランダム</button>
+        </div>
+        <div class="actions-sub">
+            <button id="laneCountButton" class="secondary">レーン人数確認</button>
+            <button id="jsonExportButton">JSON出力</button>
+            <button id="jsonImportButton" class="secondary">JSON読み込み</button>
+        </div>
+        <div id="message" class="message"></div>
+    </section>
+
+    <section class="json-section">
+        <p class="json-note">
+            JSON入出力用エリアです。<br>
+            「JSON出力」でここに表示された内容をコピーしてテキストファイル等に保存しておき、<br>
+            使うときに貼り付けて「JSON読み込み」を押してください。
+        </p>
+        <div class="json-area-wrapper">
+            <textarea id="jsonArea" placeholder="ここにJSONを表示 / 貼り付けます"></textarea>
+        </div>
+    </section>
+
+    <section id="laneCountSection" class="lane-count hidden">
+        <h2>レーン人数</h2>
+        <p class="lane-count-note">
+            ※ 第1〜第5希望のどこかに含まれている人数です（1人が複数順位に書いていても1カウント）。
+        </p>
+        <ul id="laneCountList"></ul>
+    </section>
+
+    <section id="resultSection" class="result hidden">
+        <h2>チーム分け結果</h2>
+        <div class="team-container">
+            <div class="team-card blue">
+                <h3>Blue Team</h3>
+                <p class="team-average" id="blueAverage"></p>
+                <ul id="blueList" class="team-list"></ul>
+            </div>
+            <div class="team-card red">
+                <h3>Red Team</h3>
+                <p class="team-average" id="redAverage"></p>
+                <ul id="redList" class="team-list"></ul>
+            </div>
+        </div>
+        <p class="score-info">
+            評価スコア（小さいほどバランスが良い）: <span id="scoreValue"></span>
+        </p>
+    </section>
+</div>
+</body>
+</html>
