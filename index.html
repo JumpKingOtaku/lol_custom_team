@@ -35,7 +35,7 @@
                 <thead>
                 <tr>
                     <th>#</th>
-                    <th>名前 / 一括ランク</th>
+                    <th>名前</th>
                     <th>TOPランク</th>
                     <th>JGランク</th>
                     <th>MIDランク</th>
@@ -56,31 +56,37 @@
         </div>
     </section>
 
+
+
     <section class="actions">
         <div class="actions-main">
             <button id="btnNormal">通常生成</button>
             <button id="btnPref">希望レーン重視</button>
             <button id="btnLane">対面ランク重視</button>
             <button id="btnAvg">チーム平均重視</button>
-            <button id="btnRandom" class="secondary">希望レーン内で完全ランダム</button>
+            <!-- secondary を外して他の生成ボタンと同じ青色に -->
+            <button id="btnRandom">希望レーン内で完全ランダム</button>
         </div>
+
         <div class="actions-sub">
             <button id="advancedSettingsButton" class="secondary">詳細設定</button>
             <button id="laneCountButton" class="secondary">レーン人数確認</button>
-            <button id="jsonExportButton" class="secondary">JSON出力</button>
-            <button id="jsonImportButton" class="secondary">JSON読み込み</button>
+            <button id="playerRegistryButton" class="secondary">プレイヤーリスト管理</button>
         </div>
         <div id="message" class="message"></div>
     </section>
+
+
 
     <!-- ★ 詳細設定 -->
     <section id="advancedSettingsSection" class="advanced-settings hidden">
         <h2>詳細設定（同じチーム / 別チーム 条件）</h2>
         <p class="advanced-note">
-            プレイヤー番号は、上の表の左端「#」列（1〜10）を指します。<br>
+            上の「プレイヤー情報」で設定した名前から選択できます。<br>
             使わない行は空白のままで構いません。
         </p>
         <div class="advanced-grid">
+
             <div class="advanced-block">
                 <h3>同じチームにしたいグループ</h3>
                 <div class="advanced-rows">
@@ -111,8 +117,10 @@
                 </div>
                 <p class="advanced-note">
                     1行につき2人以上選ぶと「同じチームになるグループ」として扱います。<br>
-                    例: グループ1で 1,3,5 を選ぶと「1,3,5は必ず同じチーム」になります。
+                    例: グループ1で「プレイヤーA」「プレイヤーB」「プレイヤーC」を選ぶと、
+                    その3人は必ず同じチームになります。
                 </p>
+
             </div>
 
             <div class="advanced-block">
@@ -150,9 +158,11 @@
                     </div>
                 </div>
                 <p class="advanced-note">
-                    両方に同じ番号を選ぶことはできません。<br>
-                    例: 条件1で 2 と 4 を選ぶと「2と4は必ず別チーム」になります。
+                    両方に同じ名前を選ぶことはできません。<br>
+                    例: 条件1で「プレイヤーA」と「プレイヤーB」を選ぶと、
+                    その2人は必ず別チームになります。
                 </p>
+
             </div>
         </div>
     </section>
@@ -162,6 +172,58 @@
         <p class="lane-count-note">
             ※ 第1〜第5希望のどこかに含まれている人数です（1人が複数順位に書いていても1カウント）。</p>
         <ul id="laneCountList"></ul>
+    </section>
+
+    <!-- ★ プレイヤーリスト -->
+    <section id="playerRegistrySection" class="player-registry hidden">
+        <h2>プレイヤーリスト</h2>
+        <p class="player-registry-note">
+            よく使うプレイヤーを登録しておくと、上の表の「登録プレイヤーから選択」から呼び出せます。<br>
+            ランクや備考などをあらかじめ登録しておけば、ゲームごとには希望レーンだけ入力すればOKです。
+        </p>
+
+        <!-- 登録フォーム（script.jsで中身を生成） -->
+        <div class="player-registry-form" id="playerRegistryForm"></div>
+
+        <!-- 登録済み一覧 -->
+        <div class="player-registry-list">
+            <h3>登録済みプレイヤー</h3>
+            <div class="table-wrapper">
+                <table id="playerRegistryTable">
+                    <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>名前</th>
+                        <th>TOP</th>
+                        <th>JG</th>
+                        <th>MID</th>
+                        <th>ADC</th>
+                        <th>SUP</th>
+                        <th>備考</th>
+                        <th>操作</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <!-- script.jsで生成 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- プレイヤーリスト専用 JSON 入出力 -->
+        <div class="player-registry-json">
+            <p class="player-registry-note">
+                プレイヤーリストだけをJSONで保存／復元できます。<br>
+                下のエリアをコピーしてテキストファイルに保存しておくと、あとでまとめて読み込めます。
+            </p>
+            <div class="json-area-wrapper">
+                <textarea id="playerJsonArea" placeholder="プレイヤーリストのJSONを表示 / 貼り付けます"></textarea>
+            </div>
+            <div class="player-registry-json-buttons">
+                <button id="playerJsonExportButton" class="secondary">プレイヤーリストJSON出力</button>
+                <button id="playerJsonImportButton" class="secondary">プレイヤーリストJSON読み込み</button>
+            </div>
+        </div>
     </section>
 
     <section id="resultSection" class="result hidden">
@@ -183,17 +245,11 @@
         </p>
     </section>
 
-    <!-- JSONエリア（結果の下・一番下） -->
-    <section class="json-section">
-        <p class="json-note">
-            JSON入出力用エリアです。<br>
-            「JSON出力」でここに表示された内容をコピーしてテキストファイル等に保存しておき、<br>
-            使うときに貼り付けて「JSON読み込み」を押してください。
-        </p>
-        <div class="json-area-wrapper">
-            <textarea id="jsonArea" placeholder="ここにJSONを表示 / 貼り付けます"></textarea>
-        </div>
-    </section>
+    <!-- （この JSONエリア セクションは削除） -->
+
+</div>
+</body>
+</html>
 
 </div>
 </body>
