@@ -118,6 +118,7 @@ const PREF_SELECT_CLASSES = [
 
 document.addEventListener("DOMContentLoaded", () => {
     buildPlayerTable();
+    initAdvancedSettingsControls();
 
     // 生成ボタン
     document.getElementById("btnNormal")
@@ -140,6 +141,17 @@ document.addEventListener("DOMContentLoaded", () => {
         .addEventListener("click", exportToJsonArea);
     document.getElementById("jsonImportButton")
         .addEventListener("click", importFromJsonArea);
+
+    // 詳細設定の表示切替
+    const advBtn = document.getElementById("advancedSettingsButton");
+    if (advBtn) {
+        advBtn.addEventListener("click", () => {
+            const sec = document.getElementById("advancedSettingsSection");
+            if (sec) {
+                sec.classList.toggle("hidden");
+            }
+        });
+    }
 });
 
 
@@ -505,6 +517,9 @@ function generateTeams(mode) {
     const players = collectPlayers();
     if (!players) return;
 
+    const constraints = collectConstraints();
+    if (constraints === null) return;
+
     const message = document.getElementById("message");
     message.textContent = `${mode.label}モードで計算中...`;
     message.className = "message";
@@ -518,13 +533,13 @@ function generateTeams(mode) {
     // 複数パターンを集めて、その中から「そこそこ良いもの」をランダム採用
     for (let t = 0; t < tryCount; t++) {
         const assignment = generateRandomAssignment(players, mode);
-        const score = evaluateAssignment(assignment, players, mode);
+        const score = evaluateAssignment(assignment, players, mode, constraints);
         if (!Number.isFinite(score)) continue;
         candidates.push({ assignment, score });
     }
 
     if (candidates.length === 0) {
-        message.textContent = "現在の希望レーン・ランクではチームを組めませんでした（各レーンに2人以上希望者がいて、そのレーンのランクも入力されているか確認してください）。";
+        message.textContent = "現在の希望レーン・ランクまたは詳細設定ではチームを組めませんでした（各レーンの希望人数・ランク・詳細設定を確認してください）。";
         message.classList.add("error");
         return;
     }
@@ -632,7 +647,7 @@ function getLanePreferenceRank(player, role) {
 // 割り当て評価
 // =====================
 
-function evaluateAssignment(assignment, players, mode) {
+function evaluateAssignment(assignment, players, mode, constraints) {
     if (!assignment || assignment.length !== 10) return Infinity;
 
     const prefWeight = mode.prefWeight ?? 10;
@@ -674,7 +689,51 @@ function evaluateAssignment(assignment, players, mode) {
     const redAvg = average(teamMMR.RED);
     const avgDiff = Math.abs(blueAvg - redAvg) * avgWeight;
 
-    return prefPenalty + laneDiff + avgDiff;
+    const baseScore = prefPenalty + laneDiff + avgDiff;
+
+    // 詳細設定（同じチーム / 別チーム）のチェック
+    if (constraints) {
+        const { sameGroups, diffPairs } = constraints;
+
+        if ((sameGroups && sameGroups.length > 0) || (diffPairs && diffPairs.length > 0)) {
+            const teamByPlayer = {};
+            for (const pos of assignment) {
+                teamByPlayer[pos.playerIndex] = pos.team;
+            }
+
+            // 同じチームグループ
+            if (sameGroups && sameGroups.length > 0) {
+                for (const group of sameGroups) {
+                    let firstTeam = null;
+                    for (const pIdx of group) {
+                        const t = teamByPlayer[pIdx];
+                        if (!t) return Infinity;
+                        if (firstTeam === null) {
+                            firstTeam = t;
+                        } else if (firstTeam !== t) {
+                            // 同じグループ内でチームが分かれている → NG
+                            return Infinity;
+                        }
+                    }
+                }
+            }
+
+            // 別チームペア
+            if (diffPairs && diffPairs.length > 0) {
+                for (const [a, b] of diffPairs) {
+                    const ta = teamByPlayer[a];
+                    const tb = teamByPlayer[b];
+                    if (!ta || !tb) return Infinity;
+                    if (ta === tb) {
+                        // 別チーム指定なのに同じチーム → NG
+                        return Infinity;
+                    }
+                }
+            }
+        }
+    }
+
+    return baseScore;
 }
 
 
@@ -716,7 +775,6 @@ function showResult(assignment, players, score) {
         blueMMR.push(mmr);
 
         const roleRankLabel = getLaneRankLabel(player, pos.role);
-
         const prefRank = player.lanePreferences[pos.role];
         const prefText = prefRank != null ? ` / 第${prefRank}希望` : "";
 
@@ -736,7 +794,6 @@ function showResult(assignment, players, score) {
         redMMR.push(mmr);
 
         const roleRankLabel = getLaneRankLabel(player, pos.role);
-
         const prefRank = player.lanePreferences[pos.role];
         const prefText = prefRank != null ? ` / 第${prefRank}希望` : "";
 
@@ -770,6 +827,9 @@ function generateTeamsRandom() {
     const players = collectPlayers();
     if (!players) return;
 
+    const constraints = collectConstraints();
+    if (constraints === null) return;
+
     const message = document.getElementById("message");
     message.textContent = "希望レーン内で完全ランダムにチームを生成中...";
     message.className = "message";
@@ -782,13 +842,13 @@ function generateTeamsRandom() {
     for (let t = 0; t < 350; t++) {
         const assignment = generatePureRandomAssignment(players);
         if (!assignment) continue;
-        const score = evaluateAssignment(assignment, players, MODES.normal);
+        const score = evaluateAssignment(assignment, players, MODES.normal, constraints);
         if (!Number.isFinite(score)) continue;
         candidates.push({ assignment, score });
     }
 
     if (candidates.length === 0) {
-        message.textContent = "この条件では希望レーン内だけでランダムにチームを組めませんでした。各レーンに2人以上希望者がいるか確認してください。";
+        message.textContent = "この条件では希望レーン内だけでランダムにチームを組めませんでした。各レーンに2人以上希望者がいるか、詳細設定が厳しすぎないか確認してください。";
         message.classList.add("error");
         return;
     }
@@ -900,6 +960,145 @@ function updateLaneCounts() {
     });
 
     section.classList.remove("hidden");
+}
+
+
+// =====================
+// 詳細設定（同じチーム / 別チーム）関連
+// =====================
+
+function initAdvancedSettingsControls() {
+    const section = document.getElementById("advancedSettingsSection");
+    if (!section) return;
+
+    const fillSelect = (id) => {
+        const sel = document.getElementById(id);
+        if (!sel) return;
+        sel.innerHTML = "";
+        const optBlank = document.createElement("option");
+        optBlank.value = "";
+        optBlank.textContent = "";
+        sel.appendChild(optBlank);
+        for (let i = 1; i <= 10; i++) {
+            const opt = document.createElement("option");
+            opt.value = String(i);
+            opt.textContent = `#${i}`;
+            sel.appendChild(opt);
+        }
+    };
+
+    for (let g = 1; g <= 3; g++) {
+        for (let s = 1; s <= 5; s++) {
+            fillSelect(`sameGroup-${g}-${s}`);
+        }
+    }
+    for (let r = 1; r <= 5; r++) {
+        fillSelect(`diffPair-${r}-A`);
+        fillSelect(`diffPair-${r}-B`);
+    }
+}
+
+function collectConstraints() {
+    const section = document.getElementById("advancedSettingsSection");
+    if (!section) {
+        return { sameGroups: [], diffPairs: [] };
+    }
+
+    const message = document.getElementById("message");
+    message.textContent = "";
+    message.className = "message";
+
+    const sameGroupsRaw = [];
+    for (let g = 1; g <= 3; g++) {
+        const members = [];
+        for (let s = 1; s <= 5; s++) {
+            const sel = document.getElementById(`sameGroup-${g}-${s}`);
+            if (!sel) continue;
+            const val = sel.value;
+            if (val) {
+                const idx = parseInt(val, 10) - 1;
+                if (!Number.isNaN(idx) && idx >= 0 && idx < 10 && !members.includes(idx)) {
+                    members.push(idx);
+                }
+            }
+        }
+        if (members.length >= 2) {
+            sameGroupsRaw.push(members);
+        }
+    }
+
+    const diffPairsRaw = [];
+    for (let r = 1; r <= 5; r++) {
+        const selA = document.getElementById(`diffPair-${r}-A`);
+        const selB = document.getElementById(`diffPair-${r}-B`);
+        if (!selA || !selB) continue;
+        const vA = selA.value;
+        const vB = selB.value;
+
+        if (!vA && !vB) continue;
+        if (!vA || !vB) {
+            message.textContent = `詳細設定: 別チーム条件${r}行目が片方だけ選択されています。`;
+            message.classList.add("error");
+            return null;
+        }
+        if (vA === vB) {
+            message.textContent = `詳細設定: 別チーム条件${r}行目で同じプレイヤーが選択されています。`;
+            message.classList.add("error");
+            return null;
+        }
+        const aIdx = parseInt(vA, 10) - 1;
+        const bIdx = parseInt(vB, 10) - 1;
+        if ([aIdx, bIdx].some(i => Number.isNaN(i) || i < 0 || i >= 10)) continue;
+
+        const pair = aIdx < bIdx ? [aIdx, bIdx] : [bIdx, aIdx];
+        if (!diffPairsRaw.some(p => p[0] === pair[0] && p[1] === pair[1])) {
+            diffPairsRaw.push(pair);
+        }
+    }
+
+    // 同じチームグループのマージ（重なりがあれば統合）
+    const sameGroups = [];
+    for (const members of sameGroupsRaw) {
+        let merged = [...members];
+        let changed;
+        do {
+            changed = false;
+            for (let i = sameGroups.length - 1; i >= 0; i--) {
+                const g = sameGroups[i];
+                if (g.some(x => merged.includes(x))) {
+                    merged = Array.from(new Set([...merged, ...g]));
+                    sameGroups.splice(i, 1);
+                    changed = true;
+                }
+            }
+        } while (changed);
+        sameGroups.push(merged);
+    }
+
+    // 1グループに6人以上いるのは物理的に不可能
+    for (const g of sameGroups) {
+        if (g.length > 5) {
+            message.textContent = "詳細設定: 同じチームにしたいグループに6人以上指定されています。（1チームは5人までです）";
+            message.classList.add("error");
+            return null;
+        }
+    }
+
+    // 「同じチーム」と「別チーム」が矛盾していないかチェック
+    for (const g of sameGroups) {
+        for (const pair of diffPairsRaw) {
+            if (g.includes(pair[0]) && g.includes(pair[1])) {
+                message.textContent = "詳細設定: 「同じチーム」と「別チーム」の条件が矛盾しています。設定を見直してください。";
+                message.classList.add("error");
+                return null;
+            }
+        }
+    }
+
+    return {
+        sameGroups,
+        diffPairs: diffPairsRaw
+    };
 }
 
 
