@@ -234,7 +234,7 @@ function buildPlayerTable() {
             const selectPref = document.createElement("select");
             selectPref.id = `pref-${i}-${prefIndex}`;
 
-            // ★ 初期表示は空白（valueは""で従来の「なし」と同じ扱い）
+            // 初期表示は空白（valueは""で「希望なし」と同等）
             const optNone = document.createElement("option");
             optNone.value = "";
             optNone.textContent = "";
@@ -261,12 +261,11 @@ function buildPlayerTable() {
             tr.appendChild(tdPref);
         }
 
-        // 備考（★ プレースホルダは消す）
+        // 備考（プレースホルダなし）
         const tdNote = document.createElement("td");
         const inputNote = document.createElement("input");
         inputNote.type = "text";
         inputNote.id = `note-${i}`;
-        // inputNote.placeholder = "マクロ〇"; // ← 削除
         tdNote.appendChild(inputNote);
         tr.appendChild(tdNote);
 
@@ -718,11 +717,14 @@ function showResult(assignment, players, score) {
 
         const roleRankLabel = getLaneRankLabel(player, pos.role);
 
+        const prefRank = player.lanePreferences[pos.role];
+        const prefText = prefRank != null ? ` / 第${prefRank}希望` : "";
+
         const li = document.createElement("li");
         li.innerHTML = `
             <span class="team-role">${ROLE_LABELS[pos.role]}</span>
             <span class="team-name">${player.name}</span>
-            <span class="team-rank">（${roleRankLabel}）</span>
+            <span class="team-rank">（${roleRankLabel}<span class="team-pref-rank">${prefText}</span>）</span>
             ${player.note ? `<div class="team-note">備考: ${escapeHtml(player.note)}</div>` : ""}
         `;
         blueList.appendChild(li);
@@ -735,11 +737,14 @@ function showResult(assignment, players, score) {
 
         const roleRankLabel = getLaneRankLabel(player, pos.role);
 
+        const prefRank = player.lanePreferences[pos.role];
+        const prefText = prefRank != null ? ` / 第${prefRank}希望` : "";
+
         const li = document.createElement("li");
         li.innerHTML = `
             <span class="team-role">${ROLE_LABELS[pos.role]}</span>
             <span class="team-name">${player.name}</span>
-            <span class="team-rank">（${roleRankLabel}）</span>
+            <span class="team-rank">（${roleRankLabel}<span class="team-pref-rank">${prefText}</span>）</span>
             ${player.note ? `<div class="team-note">備考: ${escapeHtml(player.note)}</div>` : ""}
         `;
         redList.appendChild(li);
