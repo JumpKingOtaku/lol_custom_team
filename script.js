@@ -111,6 +111,13 @@ const PREF_SELECT_CLASSES = [
     "pref-select-SUPPORT",
 ];
 
+// プレイヤーリスト（登録用）
+let playerRegistry = [];
+
+// 現在「何番目のプレイヤーを編集中か」を示すインデックス（新規追加時は null）
+let editingRegistryIndex = null;
+
+
 
 // =====================
 // 初期化
@@ -119,6 +126,9 @@ const PREF_SELECT_CLASSES = [
 document.addEventListener("DOMContentLoaded", () => {
     buildPlayerTable();
     initAdvancedSettingsControls();
+    initPlayerRegistryForm();
+    updatePlayerRegistrySelects();
+    refreshPlayerRegistryTable();
 
     // 生成ボタン
     document.getElementById("btnNormal")
@@ -132,25 +142,88 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("btnRandom")
         .addEventListener("click", () => generateTeamsRandom());
 
-    // レーン人数
-    document.getElementById("laneCountButton")
-        .addEventListener("click", () => updateLaneCounts());
+    // レーン人数（表示 / 非表示トグル + ボタンの状態反映）
+    const laneCountBtn = document.getElementById("laneCountButton");
+    if (laneCountBtn) {
+        laneCountBtn.addEventListener("click", () => {
+            const section = document.getElementById("laneCountSection");
+            if (!section) return;
 
-    // JSON 出力／読み込み
-    document.getElementById("jsonExportButton")
-        .addEventListener("click", exportToJsonArea);
-    document.getElementById("jsonImportButton")
-        .addEventListener("click", importFromJsonArea);
+            const willShow = section.classList.contains("hidden");
 
-    // 詳細設定の表示切替
+            if (willShow) {
+                // 表示するタイミングで毎回再計算
+                updateLaneCounts();
+                section.classList.remove("hidden");
+                laneCountBtn.classList.add("toggle-active");
+            } else {
+                section.classList.add("hidden");
+                laneCountBtn.classList.remove("toggle-active");
+            }
+        });
+    }
+
+
+
+    // JSON 出力／読み込み（10人入力用）
+    // （UIを削除したので、要素があれば…のガードだけ残しておく）
+    const jsonExportBtn = document.getElementById("jsonExportButton");
+    if (jsonExportBtn) {
+        jsonExportBtn.addEventListener("click", exportToJsonArea);
+    }
+    const jsonImportBtn = document.getElementById("jsonImportButton");
+    if (jsonImportBtn) {
+        jsonImportBtn.addEventListener("click", importFromJsonArea);
+    }
+
+    // 詳細設定の表示切替 + ボタンの状態反映
     const advBtn = document.getElementById("advancedSettingsButton");
     if (advBtn) {
         advBtn.addEventListener("click", () => {
             const sec = document.getElementById("advancedSettingsSection");
-            if (sec) {
-                sec.classList.toggle("hidden");
+            if (!sec) return;
+
+            const willShow = sec.classList.contains("hidden");
+
+            if (willShow) {
+                sec.classList.remove("hidden");
+                advBtn.classList.add("toggle-active");
+            } else {
+                sec.classList.add("hidden");
+                advBtn.classList.remove("toggle-active");
             }
         });
+    }
+
+
+    // プレイヤーリストの表示切替 + ボタンの状態反映
+    const regBtn = document.getElementById("playerRegistryButton");
+    if (regBtn) {
+        regBtn.addEventListener("click", () => {
+            const sec = document.getElementById("playerRegistrySection");
+            if (!sec) return;
+
+            const willShow = sec.classList.contains("hidden");
+
+            if (willShow) {
+                sec.classList.remove("hidden");
+                regBtn.classList.add("toggle-active");
+            } else {
+                sec.classList.add("hidden");
+                regBtn.classList.remove("toggle-active");
+            }
+        });
+    }
+
+
+    // プレイヤーリスト JSON 出力／読み込み
+    const playerExportBtn = document.getElementById("playerJsonExportButton");
+    if (playerExportBtn) {
+        playerExportBtn.addEventListener("click", exportPlayerRegistryToJsonArea);
+    }
+    const playerImportBtn = document.getElementById("playerJsonImportButton");
+    if (playerImportBtn) {
+        playerImportBtn.addEventListener("click", importPlayerRegistryFromJsonArea);
     }
 });
 
@@ -170,53 +243,46 @@ function buildPlayerTable() {
         tdIndex.textContent = i.toString();
         tr.appendChild(tdIndex);
 
-        // 名前 + 一括ランク
+        // 名前 / 一括ランク列
+        // → 登録プレイヤー選択のみ表示し、名前は hidden で保持
         const tdName = document.createElement("td");
         const nameCell = document.createElement("div");
         nameCell.className = "name-cell";
 
+        // 登録プレイヤー選択
+        const registryRow = document.createElement("div");
+        registryRow.className = "registry-row";
+        const registrySelect = document.createElement("select");
+        registrySelect.id = `playerRegistrySelect-${i}`;
+        registrySelect.className = "player-registry-select";
+
+        const optRegBlank = document.createElement("option");
+        optRegBlank.value = "";
+        optRegBlank.textContent = "";   // 初期表示は空にする
+        registrySelect.appendChild(optRegBlank);
+
+
+        registrySelect.addEventListener("change", () => {
+            const val = registrySelect.value;
+            if (!val) return;
+            const regIndex = parseInt(val, 10);
+            if (!Number.isNaN(regIndex)) {
+                applyRegistryPlayerToRow(regIndex, i);
+            }
+        });
+
+        registryRow.appendChild(registrySelect);
+        nameCell.appendChild(registryRow);
+
+        // 入力用ではなく、内部保持用の hidden 名前フィールド
         const inputName = document.createElement("input");
-        inputName.type = "text";
+        inputName.type = "hidden";
         inputName.id = `name-${i}`;
-        inputName.placeholder = `Player ${i}`;
         nameCell.appendChild(inputName);
-
-        const bulkRow = document.createElement("div");
-        bulkRow.className = "bulk-rank-row";
-
-        const bulkSelect = document.createElement("select");
-        bulkSelect.id = `bulkRank-${i}`;
-        const optBulkBlank = document.createElement("option");
-        optBulkBlank.value = "";
-        optBulkBlank.textContent = "一括ランク";
-        bulkSelect.appendChild(optBulkBlank);
-        RANKS.forEach(rank => {
-            const opt = document.createElement("option");
-            opt.value = rank.key;
-            opt.textContent = rank.label;
-            bulkSelect.appendChild(opt);
-        });
-
-        const bulkButton = document.createElement("button");
-        bulkButton.type = "button";
-        bulkButton.textContent = "全レーンに適用";
-        bulkButton.className = "bulk-rank-button";
-
-        bulkButton.addEventListener("click", () => {
-            const rankKey = bulkSelect.value;
-            if (!rankKey) return;
-            ROLES.forEach(role => {
-                const sel = document.getElementById(`laneRank-${i}-${role}`);
-                if (sel) sel.value = rankKey;
-            });
-        });
-
-        bulkRow.appendChild(bulkSelect);
-        bulkRow.appendChild(bulkButton);
-        nameCell.appendChild(bulkRow);
 
         tdName.appendChild(nameCell);
         tr.appendChild(tdName);
+
 
         // 各レーンのランク
         ROLES.forEach(role => {
@@ -423,7 +489,7 @@ function applyInputSnapshot(snapshot) {
 
 
 // =====================
-// JSON 出力 / 読み込み
+// JSON 出力 / 読み込み（10人入力）
 // =====================
 
 function exportToJsonArea() {
@@ -921,10 +987,6 @@ function generatePureRandomAssignment(players) {
 }
 
 
-// =====================
-// レーン人数確認
-// =====================
-
 function updateLaneCounts() {
     const laneCounts = {
         TOP: 0,
@@ -949,8 +1011,9 @@ function updateLaneCounts() {
         });
     }
 
-    const section = document.getElementById("laneCountSection");
     const list = document.getElementById("laneCountList");
+    if (!list) return;
+
     list.innerHTML = "";
 
     ROLES.forEach(role => {
@@ -958,8 +1021,7 @@ function updateLaneCounts() {
         li.textContent = `${ROLE_LABELS[role]}: ${laneCounts[role]}人`;
         list.appendChild(li);
     });
-
-    section.classList.remove("hidden");
+    // 表示 / 非表示はボタン側で制御する
 }
 
 
@@ -967,36 +1029,71 @@ function updateLaneCounts() {
 // 詳細設定（同じチーム / 別チーム）関連
 // =====================
 
-function initAdvancedSettingsControls() {
+// 詳細設定で使う「プレイヤー一覧」（上のプレイヤー情報から名前が入っている行だけ）を取得
+function getAdvancedSettingsPlayers() {
+    const result = [];
+    for (let i = 1; i <= 10; i++) {
+        const nameInput = document.getElementById(`name-${i}`);
+        if (!nameInput) continue;
+        const name = nameInput.value.trim();
+        if (!name) continue;              // 名前が入っている行だけ使う
+        result.push({ index: i, name });  // index は 1〜10（既存ロジック用）
+    }
+    return result;
+}
+
+// 詳細設定セレクトの表示を、現在のプレイヤー名で更新
+function refreshAdvancedSettingsSelects() {
     const section = document.getElementById("advancedSettingsSection");
     if (!section) return;
+
+    const playersForAdvanced = getAdvancedSettingsPlayers();
 
     const fillSelect = (id) => {
         const sel = document.getElementById(id);
         if (!sel) return;
+
+        const prev = sel.value; // 以前の選択を覚えておく
+
         sel.innerHTML = "";
         const optBlank = document.createElement("option");
         optBlank.value = "";
         optBlank.textContent = "";
         sel.appendChild(optBlank);
-        for (let i = 1; i <= 10; i++) {
+
+        // value は 1〜10 のまま、表示テキストだけ「名前」にする
+        playersForAdvanced.forEach(p => {
             const opt = document.createElement("option");
-            opt.value = String(i);
-            opt.textContent = `#${i}`;
+            opt.value = String(p.index);
+            opt.textContent = p.name;
             sel.appendChild(opt);
+        });
+
+        if (prev) {
+            sel.value = prev; // 可能なら元の選択を復元
         }
     };
 
+    // 「同じチームにしたいグループ」
     for (let g = 1; g <= 3; g++) {
         for (let s = 1; s <= 5; s++) {
             fillSelect(`sameGroup-${g}-${s}`);
         }
     }
+    // 「必ず別チームにしたい組み合わせ」
     for (let r = 1; r <= 5; r++) {
         fillSelect(`diffPair-${r}-A`);
         fillSelect(`diffPair-${r}-B`);
     }
 }
+
+// 初期化時は上の関数を呼ぶだけ
+function initAdvancedSettingsControls() {
+    refreshAdvancedSettingsSelects();
+}
+
+
+
 
 function collectConstraints() {
     const section = document.getElementById("advancedSettingsSection");
@@ -1099,6 +1196,418 @@ function collectConstraints() {
         sameGroups,
         diffPairs: diffPairsRaw
     };
+}
+
+
+// =====================
+// プレイヤーリスト関連
+// =====================
+
+function initPlayerRegistryForm() {
+    const container = document.getElementById("playerRegistryForm");
+    if (!container) return;
+
+    container.innerHTML = "";
+
+    // 名前
+    const rowName = document.createElement("div");
+    rowName.className = "player-registry-row";
+    const labelName = document.createElement("label");
+    labelName.textContent = "名前";
+    const inputName = document.createElement("input");
+    inputName.type = "text";
+    inputName.id = "reg-name";
+    rowName.appendChild(labelName);
+    rowName.appendChild(inputName);
+    container.appendChild(rowName);
+
+    // レーンごとのランク
+    const rowRanks = document.createElement("div");
+    rowRanks.className = "player-registry-row player-registry-row-ranks";
+    const labelRanks = document.createElement("label");
+    labelRanks.textContent = "ランク";
+    rowRanks.appendChild(labelRanks);
+
+    ROLES.forEach(role => {
+        const sub = document.createElement("div");
+        sub.className = "player-registry-lane";
+        const laneLabel = document.createElement("span");
+        laneLabel.textContent = ROLE_LABELS[role];
+        const sel = document.createElement("select");
+        sel.id = `reg-laneRank-${role}`;
+        const optBlank = document.createElement("option");
+        optBlank.value = "";
+        optBlank.textContent = "";
+        sel.appendChild(optBlank);
+        RANKS.forEach(rank => {
+            const opt = document.createElement("option");
+            opt.value = rank.key;
+            opt.textContent = rank.label;
+            sel.appendChild(opt);
+        });
+        sub.appendChild(laneLabel);
+        sub.appendChild(sel);
+        rowRanks.appendChild(sub);
+    });
+    container.appendChild(rowRanks);
+
+    // 備考
+    const rowNote = document.createElement("div");
+    rowNote.className = "player-registry-row";
+    const labelNote = document.createElement("label");
+    labelNote.textContent = "備考";
+    const inputNote = document.createElement("input");
+    inputNote.type = "text";
+    inputNote.id = "reg-note";
+    rowNote.appendChild(labelNote);
+    rowNote.appendChild(inputNote);
+    container.appendChild(rowNote);
+
+    // 追加ボタン
+    const rowButton = document.createElement("div");
+    rowButton.className = "player-registry-row";
+    const addBtn = document.createElement("button");
+    addBtn.type = "button";
+    addBtn.id = "playerAddButton";
+    addBtn.className = "secondary";
+    addBtn.textContent = "プレイヤー追加";
+    addBtn.addEventListener("click", addPlayerToRegistry);
+    rowButton.appendChild(addBtn);
+    container.appendChild(rowButton);
+}
+
+
+
+// プレイヤーリストに追加 or 更新
+function addPlayerToRegistry() {
+    const message = document.getElementById("message");
+    message.textContent = "";
+    message.className = "message";
+
+    const nameInput = document.getElementById("reg-name");
+    const noteInput = document.getElementById("reg-note");
+    if (!nameInput) return;
+
+    const name = nameInput.value.trim();
+    const note = noteInput ? noteInput.value.trim() : "";
+
+    if (!name) {
+        message.textContent = "名前を入力してください。";
+        message.classList.add("error");
+        return;
+    }
+
+    const laneRanks = {};
+    ROLES.forEach(role => {
+        const sel = document.getElementById(`reg-laneRank-${role}`);
+        laneRanks[role] = sel ? sel.value : "";
+    });
+
+    let successMessage = "";
+
+    // 編集中なら「更新」、そうでなければ「追加」
+    if (
+        editingRegistryIndex !== null &&
+        editingRegistryIndex >= 0 &&
+        editingRegistryIndex < playerRegistry.length
+    ) {
+        playerRegistry[editingRegistryIndex] = {
+            name,
+            note,
+            laneRanks
+        };
+        successMessage = "プレイヤー情報を更新しました。";
+    } else {
+        playerRegistry.push({
+            name,
+            note,
+            laneRanks
+        });
+        successMessage = "プレイヤーをリストに追加しました。";
+    }
+
+    // フォーム初期化
+    nameInput.value = "";
+    if (noteInput) noteInput.value = "";
+    ROLES.forEach(role => {
+        const sel = document.getElementById(`reg-laneRank-${role}`);
+        if (sel) sel.value = "";
+    });
+
+    // 編集モード解除 & ボタンラベル戻す
+    editingRegistryIndex = null;
+    const addBtn = document.getElementById("playerAddButton");
+    if (addBtn) {
+        addBtn.textContent = "プレイヤー追加";
+    }
+
+    refreshPlayerRegistryTable();
+    updatePlayerRegistrySelects();
+
+    message.textContent = successMessage;
+    message.classList.add("success");
+}
+
+
+
+
+
+// 登録済みプレイヤー一覧のテーブル再描画
+function refreshPlayerRegistryTable() {
+    const tbody = document.querySelector("#playerRegistryTable tbody");
+    if (!tbody) return;
+    tbody.innerHTML = "";
+
+    playerRegistry.forEach((p, index) => {
+        const tr = document.createElement("tr");
+
+        const tdIndex = document.createElement("td");
+        tdIndex.textContent = String(index + 1);
+        tr.appendChild(tdIndex);
+
+        const tdName = document.createElement("td");
+        tdName.textContent = p.name;
+        tr.appendChild(tdName);
+
+        const tdTop = document.createElement("td");
+        tdTop.textContent = p.laneRanks?.TOP
+            ? rankKeyToLabel(p.laneRanks.TOP)
+            : "";
+        tr.appendChild(tdTop);
+
+        const tdJng = document.createElement("td");
+        tdJng.textContent = p.laneRanks?.JNG
+            ? rankKeyToLabel(p.laneRanks.JNG)
+            : "";
+        tr.appendChild(tdJng);
+
+        const tdMid = document.createElement("td");
+        tdMid.textContent = p.laneRanks?.MID
+            ? rankKeyToLabel(p.laneRanks.MID)
+            : "";
+        tr.appendChild(tdMid);
+
+        const tdAdc = document.createElement("td");
+        tdAdc.textContent = p.laneRanks?.ADC
+            ? rankKeyToLabel(p.laneRanks.ADC)
+            : "";
+        tr.appendChild(tdAdc);
+
+        const tdSup = document.createElement("td");
+        tdSup.textContent = p.laneRanks?.SUPPORT
+            ? rankKeyToLabel(p.laneRanks.SUPPORT)
+            : "";
+        tr.appendChild(tdSup);
+
+        const tdNote = document.createElement("td");
+        tdNote.textContent = p.note || "";
+        tr.appendChild(tdNote);
+
+
+
+
+        // 操作（編集／削除）
+        const tdActions = document.createElement("td");
+
+        const btnEdit = document.createElement("button");
+        btnEdit.type = "button";
+        btnEdit.textContent = "編集";
+        btnEdit.className = "small secondary";
+        btnEdit.addEventListener("click", () => {
+            startEditPlayerRegistry(index);
+        });
+        tdActions.appendChild(btnEdit);
+
+        const btnDelete = document.createElement("button");
+        btnDelete.type = "button";
+        btnDelete.textContent = "削除";
+        btnDelete.className = "small secondary";
+        btnDelete.style.marginLeft = "4px";
+        btnDelete.addEventListener("click", () => {
+            playerRegistry.splice(index, 1);
+            refreshPlayerRegistryTable();
+            updatePlayerRegistrySelects();
+        });
+        tdActions.appendChild(btnDelete);
+
+        tr.appendChild(tdActions);
+
+        tbody.appendChild(tr);
+    });
+}
+
+
+// プレイヤーリストの既存データをフォームに読み込んで編集モードにする
+function startEditPlayerRegistry(index) {
+    const p = playerRegistry[index];
+    if (!p) return;
+
+    const nameInput = document.getElementById("reg-name");
+    const noteInput = document.getElementById("reg-note");
+    if (!nameInput) return;
+
+    // フォームに値をセット
+    nameInput.value = p.name || "";
+    if (noteInput) {
+        noteInput.value = p.note || "";
+    }
+
+    ROLES.forEach(role => {
+        const sel = document.getElementById(`reg-laneRank-${role}`);
+        if (sel) {
+            sel.value = p.laneRanks?.[role] ?? "";
+        }
+    });
+
+    // 編集中インデックス更新
+    editingRegistryIndex = index;
+
+    // ボタンラベルを「更新」に変更
+    const addBtn = document.getElementById("playerAddButton");
+    if (addBtn) {
+        addBtn.textContent = "更新";
+    }
+
+    // メッセージ表示（任意）
+    const message = document.getElementById("message");
+    if (message) {
+        message.textContent = `#${index + 1}「${p.name}」を編集中です。`;
+        message.className = "message success";
+    }
+}
+
+
+function updatePlayerRegistrySelects() {
+    for (let row = 1; row <= 10; row++) {
+        const sel = document.getElementById(`playerRegistrySelect-${row}`);
+        if (!sel) continue;
+
+        const currentValue = sel.value;
+        sel.innerHTML = "";
+        const optDefault = document.createElement("option");
+        optDefault.value = "";
+        optDefault.textContent = ""; // 初期表示は空にする
+        sel.appendChild(optDefault);
+
+playerRegistry.forEach((p, idx) => {
+    const opt = document.createElement("option");
+    opt.value = String(idx);
+    opt.textContent = p.name;  // 番号なしで名前だけ表示
+    sel.appendChild(opt);
+});
+
+
+        if (currentValue && !Number.isNaN(parseInt(currentValue, 10))) {
+            const num = parseInt(currentValue, 10);
+            if (num >= 0 && num < playerRegistry.length) {
+                sel.value = currentValue;
+            }
+        }
+    }
+}
+
+function applyRegistryPlayerToFirstEmptyRow(regIndex) {
+    const p = playerRegistry[regIndex];
+    if (!p) return;
+
+    let targetRow = null;
+    for (let i = 1; i <= 10; i++) {
+        const nameInput = document.getElementById(`name-${i}`);
+        if (nameInput && !nameInput.value.trim()) {
+            targetRow = i;
+            break;
+        }
+    }
+    if (!targetRow) {
+        targetRow = 1; // 全部埋まってる場合は1行目に上書き
+    }
+
+    applyRegistryPlayerToRow(regIndex, targetRow);
+}
+
+function applyRegistryPlayerToRow(regIndex, rowNo) {
+    const p = playerRegistry[regIndex];
+    if (!p) return;
+
+    const nameInput = document.getElementById(`name-${rowNo}`);
+    if (nameInput) nameInput.value = p.name;
+
+    const noteInput = document.getElementById(`note-${rowNo}`);
+    if (noteInput) noteInput.value = p.note || "";
+
+    ROLES.forEach(role => {
+        const sel = document.getElementById(`laneRank-${rowNo}-${role}`);
+        if (!sel) return;
+        const val = p.laneRanks && p.laneRanks[role];
+        sel.value = val || "";
+    });
+
+    // プレイヤー情報が変わったら、詳細設定の候補（プルダウン）も更新
+    if (typeof refreshAdvancedSettingsSelects === "function") {
+        refreshAdvancedSettingsSelects();
+    }
+}
+
+
+// プレイヤーリスト JSON 出力
+function exportPlayerRegistryToJsonArea() {
+    const message = document.getElementById("message");
+    message.textContent = "";
+    message.className = "message";
+
+    try {
+        const area = document.getElementById("playerJsonArea");
+        if (!area) return;
+        area.value = JSON.stringify(playerRegistry, null, 2);
+        message.textContent = "プレイヤーリストをJSONとして出力しました。";
+        message.classList.add("success");
+    } catch (e) {
+        console.error(e);
+        message.textContent = "プレイヤーリストのJSON出力に失敗しました。";
+        message.classList.add("error");
+    }
+}
+
+// プレイヤーリスト JSON 読み込み
+function importPlayerRegistryFromJsonArea() {
+    const message = document.getElementById("message");
+    message.textContent = "";
+    message.className = "message";
+
+    const area = document.getElementById("playerJsonArea");
+    if (!area) return;
+    const text = area.value.trim();
+    if (!text) {
+        message.textContent = "プレイヤーリストのJSONが入力されていません。";
+        message.classList.add("error");
+        return;
+    }
+
+    try {
+        const data = JSON.parse(text);
+        if (!Array.isArray(data)) {
+            throw new Error("プレイヤーリストは配列形式である必要があります。");
+        }
+        playerRegistry = data.map(raw => ({
+            name: raw.name ?? "",
+            note: raw.note ?? "",
+            laneRanks: {
+                TOP: raw.laneRanks?.TOP ?? "",
+                JNG: raw.laneRanks?.JNG ?? "",
+                MID: raw.laneRanks?.MID ?? "",
+                ADC: raw.laneRanks?.ADC ?? "",
+                SUPPORT: raw.laneRanks?.SUPPORT ?? raw.laneRanks?.SUP ?? ""
+            }
+        }));
+        refreshPlayerRegistryTable();
+        updatePlayerRegistrySelects();
+        message.textContent = "プレイヤーリストをJSONから読み込みました。";
+        message.classList.add("success");
+    } catch (e) {
+        console.error(e);
+        message.textContent = "プレイヤーリストJSONの解析に失敗しました。形式が正しいか確認してください。";
+        message.classList.add("error");
+    }
 }
 
 
