@@ -1549,12 +1549,25 @@ tdSup.textContent = supKey ? rankKeyToLabel(supKey) : "";
 applyRankLabelStyle(tdSup, supKey);
 tr.appendChild(tdSup);
 
+// 第1〜第5希望レーン
+for (let prefIndex = 0; prefIndex < 5; prefIndex++) {
+    const tdPref = document.createElement("td");
+    const key = Array.isArray(p.lanePrefs) ? (p.lanePrefs[prefIndex] || "") : "";
 
+    tdPref.textContent = key ? (ROLE_LABELS[key] || key) : "";
 
+    if (key) {
+        // 希望レーン select と同じ色クラスを付与
+        tdPref.classList.add(`pref-select-${key}`);
+    }
 
-        const tdNote = document.createElement("td");
-        tdNote.textContent = p.note || "";
-        tr.appendChild(tdNote);
+    tr.appendChild(tdPref);
+}
+
+const tdNote = document.createElement("td");
+tdNote.textContent = p.note || "";
+tr.appendChild(tdNote);
+
 
 
 
