@@ -213,17 +213,29 @@
         <!-- プレイヤーリスト専用 JSON 入出力 -->
         <div class="player-registry-json">
             <p class="player-registry-note">
-                プレイヤーリストだけをJSONで保存／復元できます。<br>
-                下のエリアをコピーしてテキストファイルに保存しておくと、あとでまとめて読み込めます。
+                プレイヤーリストだけをJSONファイルとして保存／復元できます。<br>
+                ボタンでファイル保存・読み込み、または下のエリアにドラッグ＆ドロップしてください。
             </p>
+
+            <!-- 中身を確認したいとき用（普段は触らなくてOK） -->
             <div class="json-area-wrapper">
-                <textarea id="playerJsonArea" placeholder="プレイヤーリストのJSONを表示 / 貼り付けます"></textarea>
+                <textarea id="playerJsonArea"
+                          placeholder="プレイヤーリストのJSON内容を確認したいときだけ使います（通常は入力不要です）"></textarea>
             </div>
+
             <div class="player-registry-json-buttons">
-                <button id="playerJsonExportButton" class="secondary">プレイヤーリストJSON出力</button>
-                <button id="playerJsonImportButton" class="secondary">プレイヤーリストJSON読み込み</button>
+                <button id="playerJsonExportButton" class="secondary">JSONファイル保存</button>
+                <button id="playerJsonImportButton" class="secondary">JSONファイル読み込み</button>
+                <!-- クリック用の非表示 input -->
+                <input id="playerJsonFileInput" type="file" accept="application/json" style="display:none;">
+            </div>
+
+            <!-- ドラッグ＆ドロップゾーン -->
+            <div id="playerJsonDropZone" class="json-drop-zone">
+                JSONファイルをここにドラッグ＆ドロップして読み込み
             </div>
         </div>
+
     </section>
 
     <section id="resultSection" class="result hidden">
