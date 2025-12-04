@@ -128,9 +128,11 @@ button.secondary:hover {
 
 /* トグルボタンが「表示中」のときの見た目 */
 button.secondary.toggle-active {
-    background: #6b7280;
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.7);
+    background: #10b981;                   /* 明るい緑で「開いている」感を出す */
+    color: #0b1120;                        /* 文字は少し濃い色で読みやすく */
+    box-shadow: 0 0 0 2px rgba(16,185,129,0.7);  /* 枠線も緑系に */
 }
+
 
 
 button.small {
@@ -555,3 +557,22 @@ button.small {
     gap: 8px;
     flex-wrap: wrap;
 }
+
+/* JSON ドラッグ＆ドロップ用 */
+.json-drop-zone {
+    margin-top: 8px;
+    padding: 25px 10px;
+    border-radius: 8px;
+    border: 1px dashed #4b5563;
+    background: #020617;
+    color: #9ca3af;
+    font-size: 12px;
+    text-align: center;
+}
+
+.json-drop-zone.dragover {
+    border-color: #60a5fa;
+    background: #030712;
+    color: #e5e7eb;
+}
+
