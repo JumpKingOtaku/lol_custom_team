@@ -322,12 +322,22 @@ function buildPlayerTable() {
 
         registrySelect.addEventListener("change", () => {
             const val = registrySelect.value;
-            if (!val) return;
+
+            // ★ 空（初期表示）に戻したら、その行をリセット
+            if (!val) {
+                clearPlayerRow(i);
+                if (typeof refreshAdvancedSettingsSelects === "function") {
+                    refreshAdvancedSettingsSelects();
+                }
+                return;
+            }
+
             const regIndex = parseInt(val, 10);
             if (!Number.isNaN(regIndex)) {
                 applyRegistryPlayerToRow(regIndex, i);
             }
         });
+
 
         registryRow.appendChild(registrySelect);
         nameCell.appendChild(registryRow);
@@ -342,27 +352,36 @@ function buildPlayerTable() {
         tr.appendChild(tdName);
 
 
-        // 各レーンのランク
-        ROLES.forEach(role => {
-            const tdLaneRank = document.createElement("td");
-            const selectLaneRank = document.createElement("select");
-            selectLaneRank.id = `laneRank-${i}-${role}`;
+// 各レーンのランク
+ROLES.forEach(role => {
+    const tdLaneRank = document.createElement("td");
+    const selectLaneRank = document.createElement("select");
+    selectLaneRank.id = `laneRank-${i}-${role}`;
 
-            const optBlank = document.createElement("option");
-            optBlank.value = "";
-            optBlank.textContent = "";
-            selectLaneRank.appendChild(optBlank);
+    const optBlank = document.createElement("option");
+    optBlank.value = "";
+    optBlank.textContent = "";
+    selectLaneRank.appendChild(optBlank);
 
-            RANKS.forEach(rank => {
-                const opt = document.createElement("option");
-                opt.value = rank.key;
-                opt.textContent = rank.label;
-                selectLaneRank.appendChild(opt);
-            });
+    RANKS.forEach(rank => {
+        const opt = document.createElement("option");
+        opt.value = rank.key;
+        opt.textContent = rank.label;
+        applyRankOptionStyle(opt, rank.key);   // ★ ランクごとの色クラス
+        selectLaneRank.appendChild(opt);
+    });
 
-            tdLaneRank.appendChild(selectLaneRank);
-            tr.appendChild(tdLaneRank);
-        });
+    // ★ 選択されたランクに応じて select の色を更新
+    selectLaneRank.addEventListener("change", () => {
+        updateRankSelectColor(selectLaneRank);
+    });
+    // 初期状態（空なので色なし）
+    updateRankSelectColor(selectLaneRank);
+
+    tdLaneRank.appendChild(selectLaneRank);
+    tr.appendChild(tdLaneRank);
+});
+
 
         // 第1～第5希望
         for (let prefIndex = 1; prefIndex <= 5; prefIndex++) {
@@ -524,12 +543,14 @@ function applyInputSnapshot(snapshot) {
         document.getElementById(`name-${i}`).value = data.name ?? "";
         document.getElementById(`note-${i}`).value = data.note ?? "";
 
-        ROLES.forEach(role => {
-            const sel = document.getElementById(`laneRank-${i}-${role}`);
-            if (!sel) return;
-            const val = (data.laneRanks && data.laneRanks[role]) || "";
-            sel.value = val;
-        });
+ROLES.forEach(role => {
+    const sel = document.getElementById(`laneRank-${i}-${role}`);
+    if (!sel) return;
+    const val = (data.laneRanks && data.laneRanks[role]) || "";
+    sel.value = val;
+    updateRankSelectColor(sel);   // ★ 復元時も色更新
+});
+
 
         if (Array.isArray(data.prefs)) {
             for (let prefIndex = 1; prefIndex <= 5; prefIndex++) {
@@ -1279,38 +1300,84 @@ function initPlayerRegistryForm() {
     rowName.appendChild(inputName);
     container.appendChild(rowName);
 
-    // レーンごとのランク
-    const rowRanks = document.createElement("div");
-    rowRanks.className = "player-registry-row player-registry-row-ranks";
-    const labelRanks = document.createElement("label");
-    labelRanks.textContent = "ランク";
-    rowRanks.appendChild(labelRanks);
+// レーンごとのランク
+const rowRanks = document.createElement("div");
+rowRanks.className = "player-registry-row player-registry-row-ranks";
+const labelRanks = document.createElement("label");
+labelRanks.textContent = "ランク";
+rowRanks.appendChild(labelRanks);
+
+ROLES.forEach(role => {
+    const sub = document.createElement("div");
+    sub.className = "player-registry-lane";
+    const laneLabel = document.createElement("span");
+    laneLabel.textContent = ROLE_LABELS[role];
+    const sel = document.createElement("select");
+    sel.id = `reg-laneRank-${role}`;
+    const optBlank = document.createElement("option");
+    optBlank.value = "";
+    optBlank.textContent = "";
+    sel.appendChild(optBlank);
+    RANKS.forEach(rank => {
+        const opt = document.createElement("option");
+        opt.value = rank.key;
+        opt.textContent = rank.label;
+        applyRankOptionStyle(opt, rank.key);   // ★ option 色
+        sel.appendChild(opt);
+    });
+    sel.addEventListener("change", () => {
+        updateRankSelectColor(sel);           // ★ select 本体の色更新
+    });
+    updateRankSelectColor(sel);
+
+    sub.appendChild(laneLabel);
+    sub.appendChild(sel);
+    rowRanks.appendChild(sub);
+});
+container.appendChild(rowRanks);
+
+// ★ 希望レーン
+const rowPrefs = document.createElement("div");
+rowPrefs.className = "player-registry-row player-registry-row-prefs";
+const labelPrefs = document.createElement("label");
+labelPrefs.textContent = "希望レーン";
+rowPrefs.appendChild(labelPrefs);
+
+for (let prefIndex = 1; prefIndex <= 5; prefIndex++) {
+    const sub = document.createElement("div");
+    sub.className = "player-registry-pref";
+    const prefLabel = document.createElement("span");
+    prefLabel.textContent = `第${prefIndex}希望`;
+    const sel = document.createElement("select");
+    sel.id = `reg-pref-${prefIndex}`;
+
+    const optNone = document.createElement("option");
+    optNone.value = "";
+    optNone.textContent = "";
+    sel.appendChild(optNone);
 
     ROLES.forEach(role => {
-        const sub = document.createElement("div");
-        sub.className = "player-registry-lane";
-        const laneLabel = document.createElement("span");
-        laneLabel.textContent = ROLE_LABELS[role];
-        const sel = document.createElement("select");
-        sel.id = `reg-laneRank-${role}`;
-        const optBlank = document.createElement("option");
-        optBlank.value = "";
-        optBlank.textContent = "";
-        sel.appendChild(optBlank);
-        RANKS.forEach(rank => {
-            const opt = document.createElement("option");
-            opt.value = rank.key;
-            opt.textContent = rank.label;
-            sel.appendChild(opt);
-        });
-        sub.appendChild(laneLabel);
-        sub.appendChild(sel);
-        rowRanks.appendChild(sub);
+        const opt = document.createElement("option");
+        opt.value = role;
+        opt.textContent = ROLE_LABELS[role];
+        opt.classList.add(`pref-option-${role}`); // レーン色（既存と同じ）
+        sel.appendChild(opt);
     });
-    container.appendChild(rowRanks);
 
-    // 備考
-    const rowNote = document.createElement("div");
+    sel.addEventListener("change", () => {
+        updatePrefSelectColor(sel);
+    });
+    updatePrefSelectColor(sel);
+
+    sub.appendChild(prefLabel);
+    sub.appendChild(sel);
+    rowPrefs.appendChild(sub);
+}
+container.appendChild(rowPrefs);
+
+// 備考
+const rowNote = document.createElement("div");
+
     rowNote.className = "player-registry-row";
     const labelNote = document.createElement("label");
     labelNote.textContent = "備考";
@@ -1361,6 +1428,13 @@ function addPlayerToRegistry() {
         laneRanks[role] = sel ? sel.value : "";
     });
 
+const lanePrefs = [];
+for (let prefIndex = 1; prefIndex <= 5; prefIndex++) {
+    const sel = document.getElementById(`reg-pref-${prefIndex}`);
+    lanePrefs.push(sel ? sel.value : "");
+}
+
+
     let successMessage = "";
 
     // 編集中なら「更新」、そうでなければ「追加」
@@ -1372,25 +1446,40 @@ function addPlayerToRegistry() {
         playerRegistry[editingRegistryIndex] = {
             name,
             note,
-            laneRanks
+            laneRanks,
+            lanePrefs
         };
         successMessage = "プレイヤー情報を更新しました。";
     } else {
         playerRegistry.push({
             name,
             note,
-            laneRanks
+            laneRanks,
+            lanePrefs
         });
         successMessage = "プレイヤーをリストに追加しました。";
     }
 
-    // フォーム初期化
-    nameInput.value = "";
-    if (noteInput) noteInput.value = "";
-    ROLES.forEach(role => {
-        const sel = document.getElementById(`reg-laneRank-${role}`);
-        if (sel) sel.value = "";
-    });
+// フォーム初期化
+nameInput.value = "";
+if (noteInput) noteInput.value = "";
+
+ROLES.forEach(role => {
+    const sel = document.getElementById(`reg-laneRank-${role}`);
+    if (sel) {
+        sel.value = "";
+        updateRankSelectColor(sel);   // ★ 色もリセット
+    }
+});
+
+for (let prefIndex = 1; prefIndex <= 5; prefIndex++) {
+    const selPref = document.getElementById(`reg-pref-${prefIndex}`);
+    if (selPref) {
+        selPref.value = "";
+        updatePrefSelectColor(selPref);
+    }
+}
+
 
     // 編集モード解除 & ボタンラベル戻す
     editingRegistryIndex = null;
@@ -1427,35 +1516,41 @@ function refreshPlayerRegistryTable() {
         tdName.textContent = p.name;
         tr.appendChild(tdName);
 
-        const tdTop = document.createElement("td");
-        tdTop.textContent = p.laneRanks?.TOP
-            ? rankKeyToLabel(p.laneRanks.TOP)
-            : "";
-        tr.appendChild(tdTop);
 
-        const tdJng = document.createElement("td");
-        tdJng.textContent = p.laneRanks?.JNG
-            ? rankKeyToLabel(p.laneRanks.JNG)
-            : "";
-        tr.appendChild(tdJng);
 
-        const tdMid = document.createElement("td");
-        tdMid.textContent = p.laneRanks?.MID
-            ? rankKeyToLabel(p.laneRanks.MID)
-            : "";
-        tr.appendChild(tdMid);
 
-        const tdAdc = document.createElement("td");
-        tdAdc.textContent = p.laneRanks?.ADC
-            ? rankKeyToLabel(p.laneRanks.ADC)
-            : "";
-        tr.appendChild(tdAdc);
+const tdTop = document.createElement("td");
+const topKey = p.laneRanks?.TOP || "";
+tdTop.textContent = topKey ? rankKeyToLabel(topKey) : "";
+applyRankLabelStyle(tdTop, topKey);
+tr.appendChild(tdTop);
 
-        const tdSup = document.createElement("td");
-        tdSup.textContent = p.laneRanks?.SUPPORT
-            ? rankKeyToLabel(p.laneRanks.SUPPORT)
-            : "";
-        tr.appendChild(tdSup);
+const tdJng = document.createElement("td");
+const jngKey = p.laneRanks?.JNG || "";
+tdJng.textContent = jngKey ? rankKeyToLabel(jngKey) : "";
+applyRankLabelStyle(tdJng, jngKey);
+tr.appendChild(tdJng);
+
+const tdMid = document.createElement("td");
+const midKey = p.laneRanks?.MID || "";
+tdMid.textContent = midKey ? rankKeyToLabel(midKey) : "";
+applyRankLabelStyle(tdMid, midKey);
+tr.appendChild(tdMid);
+
+const tdAdc = document.createElement("td");
+const adcKey = p.laneRanks?.ADC || "";
+tdAdc.textContent = adcKey ? rankKeyToLabel(adcKey) : "";
+applyRankLabelStyle(tdAdc, adcKey);
+tr.appendChild(tdAdc);
+
+const tdSup = document.createElement("td");
+const supKey = p.laneRanks?.SUPPORT || "";
+tdSup.textContent = supKey ? rankKeyToLabel(supKey) : "";
+applyRankLabelStyle(tdSup, supKey);
+tr.appendChild(tdSup);
+
+
+
 
         const tdNote = document.createElement("td");
         tdNote.textContent = p.note || "";
@@ -1510,12 +1605,24 @@ function startEditPlayerRegistry(index) {
         noteInput.value = p.note || "";
     }
 
-    ROLES.forEach(role => {
-        const sel = document.getElementById(`reg-laneRank-${role}`);
-        if (sel) {
-            sel.value = p.laneRanks?.[role] ?? "";
-        }
-    });
+ROLES.forEach(role => {
+    const sel = document.getElementById(`reg-laneRank-${role}`);
+    if (sel) {
+        sel.value = p.laneRanks?.[role] ?? "";
+        updateRankSelectColor(sel);
+    }
+});
+
+for (let prefIndex = 1; prefIndex <= 5; prefIndex++) {
+    const selPref = document.getElementById(`reg-pref-${prefIndex}`);
+    if (!selPref) continue;
+    const val = Array.isArray(p.lanePrefs)
+        ? (p.lanePrefs[prefIndex - 1] || "")
+        : "";
+    selPref.value = val;
+    updatePrefSelectColor(selPref);
+}
+
 
     // 編集中インデックス更新
     editingRegistryIndex = index;
@@ -1583,6 +1690,37 @@ function applyRegistryPlayerToFirstEmptyRow(regIndex) {
     applyRegistryPlayerToRow(regIndex, targetRow);
 }
 
+// プレイヤー1行分を初期状態（空）に戻す
+function clearPlayerRow(rowNo) {
+    // 名前
+    const nameInput = document.getElementById(`name-${rowNo}`);
+    if (nameInput) nameInput.value = "";
+
+    // 備考
+    const noteInput = document.getElementById(`note-${rowNo}`);
+    if (noteInput) noteInput.value = "";
+
+    // ランク（TOP/JG/MID/ADC/SUP）
+    ROLES.forEach(role => {
+        const sel = document.getElementById(`laneRank-${rowNo}-${role}`);
+        if (!sel) return;
+        sel.value = "";
+        if (typeof updateRankSelectColor === "function") {
+            updateRankSelectColor(sel);
+        }
+    });
+
+    // 希望レーン（第1〜第5希望）
+    for (let prefIndex = 1; prefIndex <= 5; prefIndex++) {
+        const selPref = document.getElementById(`pref-${rowNo}-${prefIndex}`);
+        if (!selPref) continue;
+        selPref.value = "";
+        if (typeof updatePrefSelectColor === "function") {
+            updatePrefSelectColor(selPref);
+        }
+    }
+}
+
 function applyRegistryPlayerToRow(regIndex, rowNo) {
     const p = playerRegistry[regIndex];
     if (!p) return;
@@ -1598,7 +1736,19 @@ function applyRegistryPlayerToRow(regIndex, rowNo) {
         if (!sel) return;
         const val = p.laneRanks && p.laneRanks[role];
         sel.value = val || "";
+        updateRankSelectColor(sel);   // ★ ランク色反映
     });
+
+    // ★ 希望レーンも反映
+    if (Array.isArray(p.lanePrefs)) {
+        for (let prefIndex = 1; prefIndex <= 5; prefIndex++) {
+            const selPref = document.getElementById(`pref-${rowNo}-${prefIndex}`);
+            if (!selPref) continue;
+            const val = p.lanePrefs[prefIndex - 1] || "";
+            selPref.value = val;
+            updatePrefSelectColor(selPref);
+        }
+    }
 
     // プレイヤー情報が変わったら、詳細設定の候補（プルダウン）も更新
     if (typeof refreshAdvancedSettingsSelects === "function") {
@@ -1606,9 +1756,38 @@ function applyRegistryPlayerToRow(regIndex, rowNo) {
     }
 }
 
-// 汎用: JSON ファイルをダウンロードさせる
+
 function downloadJsonFile(filename, data) {
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const jsonText = JSON.stringify(data, null, 2);
+
+    // Chrome / Edge などで使える場合は「名前を付けて保存」ダイアログを出す
+    if (window.showSaveFilePicker) {
+        (async () => {
+            try {
+                const handle = await window.showSaveFilePicker({
+                    suggestedName: filename,
+                    types: [
+                        {
+                            description: "JSONファイル",
+                            accept: { "application/json": [".json"] }
+                        }
+                    ]
+                });
+
+                const writable = await handle.createWritable();
+                await writable.write(jsonText);
+                await writable.close();
+            } catch (e) {
+                // キャンセルなどの場合は何もしない（エラーだけコンソールに出す）
+                console.error(e);
+            }
+        })();
+
+        return;
+    }
+
+    // 上のAPIが使えないブラウザは従来通り「自動ダウンロード」
+    const blob = new Blob([jsonText], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -1618,6 +1797,7 @@ function downloadJsonFile(filename, data) {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 }
+
 
 // 共通: JSON文字列からプレイヤーリストを復元
 function loadPlayerRegistryFromJsonText(text) {
@@ -1642,8 +1822,16 @@ function loadPlayerRegistryFromJsonText(text) {
                 MID:      raw.laneRanks?.MID      ?? "",
                 ADC:      raw.laneRanks?.ADC      ?? "",
                 SUPPORT:  raw.laneRanks?.SUPPORT  ?? raw.laneRanks?.SUP ?? ""
-            }
+            },
+            lanePrefs: [
+                raw.lanePrefs?.[0] ?? "",
+                raw.lanePrefs?.[1] ?? "",
+                raw.lanePrefs?.[2] ?? "",
+                raw.lanePrefs?.[3] ?? "",
+                raw.lanePrefs?.[4] ?? ""
+            ]
         }));
+
 
         refreshPlayerRegistryTable();
         updatePlayerRegistrySelects();
@@ -1760,9 +1948,51 @@ function updatePrefSelectColor(selectEl) {
     selectEl.classList.add(`pref-select-${val}`);
 }
 
+// ランクキー ("IRON_IV" など) からティア部分 ("IRON") を取り出す
+function rankKeyToTier(rankKey) {
+    if (!rankKey) return "";
+    const idx = rankKey.indexOf("_");
+    if (idx === -1) return rankKey;
+    return rankKey.substring(0, idx);
+}
+
+// ランク select 本体の色を切り替える
+function updateRankSelectColor(selectEl) {
+    ["IRON","BRONZE","SILVER","GOLD","PLATINUM","EMERALD","DIAMOND"].forEach(tier => {
+        selectEl.classList.remove(`rank-select-${tier}`);
+    });
+
+    const val = selectEl.value;
+    if (!val) return;
+
+    const tier = rankKeyToTier(val);
+    if (!tier) return;
+
+    selectEl.classList.add(`rank-select-${tier}`);
+}
+
+// ランク option に色用クラスを付ける
+function applyRankOptionStyle(optionEl, rankKey) {
+    const tier = rankKeyToTier(rankKey);
+    if (!tier) return;
+    optionEl.classList.add(`rank-option-${tier}`);
+}
+
+// ランク表示用の td などに色クラスを付ける
+function applyRankLabelStyle(element, rankKey) {
+    ["IRON","BRONZE","SILVER","GOLD","PLATINUM","EMERALD","DIAMOND"].forEach(tier => {
+        element.classList.remove(`rank-label-${tier}`);
+    });
+    if (!rankKey) return;
+    const tier = rankKeyToTier(rankKey);
+    if (!tier) return;
+    element.classList.add(`rank-label-${tier}`);
+}
+
 // 0〜maxIndex-1 の中から「小さい方に寄りつつ、たまに大きめも出る」ランダムインデックス
 function pickBiasedIndex(maxIndex) {
     const r = Math.random();
+
     const biased = Math.pow(r, 1.4);
     return Math.floor(biased * maxIndex);
 }
