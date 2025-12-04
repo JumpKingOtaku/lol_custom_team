@@ -381,6 +381,75 @@ button.small {
     color: #f9a8d4;
 }
 
+/* ランク選択肢（option）の色 */
+.rank-option-IRON {
+    color: #9ca3af;  /* 少し明るめのグレー */
+}
+.rank-option-BRONZE {
+    color: #b45309;  /* 茶色寄り */
+}
+.rank-option-SILVER {
+    color: #f3f4f6;  /* かなり明るいグレー */
+}
+.rank-option-GOLD {
+    color: #facc15;  /* ゴールド */
+}
+.rank-option-PLATINUM {
+    color: #7dd3fc;  /* 水色 */
+}
+.rank-option-EMERALD {
+    color: #6ee7b7;  /* エメラルド系 */
+}
+.rank-option-DIAMOND {
+    color: #60a5fa;  /* 青 */
+}
+
+/* ランク選択後の色（select 本体） */
+.rank-select-IRON {
+    color: #9ca3af;
+}
+.rank-select-BRONZE {
+    color: #b45309;
+}
+.rank-select-SILVER {
+    color: #f3f4f6;
+}
+.rank-select-GOLD {
+    color: #facc15;
+}
+.rank-select-PLATINUM {
+    color: #7dd3fc;
+}
+.rank-select-EMERALD {
+    color: #6ee7b7;
+}
+.rank-select-DIAMOND {
+    color: #60a5fa;
+}
+
+/* 登録済みプレイヤー一覧などのランク表示用 */
+.rank-label-IRON {
+    color: #9ca3af;
+}
+.rank-label-BRONZE {
+    color: #b45309;
+}
+.rank-label-SILVER {
+    color: #f3f4f6;
+}
+.rank-label-GOLD {
+    color: #facc15;
+}
+.rank-label-PLATINUM {
+    color: #7dd3fc;
+}
+.rank-label-EMERALD {
+    color: #6ee7b7;
+}
+.rank-label-DIAMOND {
+    color: #60a5fa;
+}
+
 /* 詳細設定エリア */
 .advanced-settings {
     margin-top: 12px;
@@ -390,6 +459,7 @@ button.small {
     font-size: 12px;
     border: 1px solid #1f2937;
 }
+
 
 .advanced-grid {
     margin-top: 6px;
@@ -491,6 +561,7 @@ button.small {
     max-width: 632px;  /* 広い画面でも伸びすぎないように */
 }
 
+
 /* ランク行全体のコンテナ */
 .player-registry-row-ranks {
     align-items: flex-start;
@@ -501,22 +572,33 @@ button.small {
     padding-top: 18px;   /* セレクトボックスの高さに合わせて少し下げる */
 }
 
+/* 希望レーン行全体のコンテナもランク行と揃える */
+.player-registry-row-prefs {
+    align-items: flex-start;
+}
 
+/* 「希望レーン」の文字もセレクトの列と高さをそろえる */
+.player-registry-row-prefs label {
+    padding-top: 18px;
+}
 
-/* レーンランク（TOP/JG/MID/ADC/SUP）が改行されないよう少し広めにする */
-.player-registry-lane {
+/* レーンランク（TOP/JG/MID/ADC/SUP）と希望レーン（第1希望〜第5希望）が
+   改行されないよう少し広めにし、同じ幅・同じスタイルにする */
+.player-registry-lane,
+.player-registry-pref {
     display: flex;
     flex-direction: column;
     gap: 2px;
     min-width: 120px;
 }
 
-.player-registry-lane span {
+/* 上の「TOP / JG …」と「第1希望〜第5希望」の文字の色・大きさを統一 */
+.player-registry-lane span,
+.player-registry-pref span {
     font-size: 11px;
     opacity: 0.8;
     white-space: nowrap;
 }
-
 
 
 
