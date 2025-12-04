@@ -2010,4 +2010,3 @@ function assignmentHash(assignment) {
         .join("|");
     return normalized;
 }
-
