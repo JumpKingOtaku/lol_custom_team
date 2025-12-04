@@ -216,15 +216,73 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
 
-    // プレイヤーリスト JSON 出力／読み込み
+    // プレイヤーリスト JSON 出力（ファイル保存）
     const playerExportBtn = document.getElementById("playerJsonExportButton");
     if (playerExportBtn) {
         playerExportBtn.addEventListener("click", exportPlayerRegistryToJsonArea);
     }
+
+    // プレイヤーリスト JSON 読み込み（ファイル選択 + D&D）
+    const playerFileInput = document.getElementById("playerJsonFileInput");
     const playerImportBtn = document.getElementById("playerJsonImportButton");
-    if (playerImportBtn) {
-        playerImportBtn.addEventListener("click", importPlayerRegistryFromJsonArea);
+
+    // ボタン → ファイル選択ダイアログ
+    if (playerImportBtn && playerFileInput) {
+        playerImportBtn.addEventListener("click", () => {
+            playerFileInput.value = "";
+            playerFileInput.click();
+        });
     }
+
+    // ファイル選択で読み込み
+    if (playerFileInput) {
+        playerFileInput.addEventListener("change", (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const text = String(ev.target.result || "");
+                const area = document.getElementById("playerJsonArea");
+                if (area) {
+                    area.value = text;
+                }
+                loadPlayerRegistryFromJsonText(text);
+            };
+            reader.readAsText(file, "utf-8");
+        });
+    }
+
+    // ドラッグ＆ドロップで読み込み
+    const dropZone = document.getElementById("playerJsonDropZone");
+    if (dropZone) {
+        dropZone.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            dropZone.classList.add("dragover");
+        });
+        dropZone.addEventListener("dragleave", () => {
+            dropZone.classList.remove("dragover");
+        });
+        dropZone.addEventListener("drop", (e) => {
+            e.preventDefault();
+            dropZone.classList.remove("dragover");
+
+            const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const text = String(ev.target.result || "");
+                const area = document.getElementById("playerJsonArea");
+                if (area) {
+                    area.value = text;
+                }
+                loadPlayerRegistryFromJsonText(text);
+            };
+            reader.readAsText(file, "utf-8");
+        });
+    }
+
 });
 
 
@@ -1548,39 +1606,25 @@ function applyRegistryPlayerToRow(regIndex, rowNo) {
     }
 }
 
-
-// プレイヤーリスト JSON 出力
-function exportPlayerRegistryToJsonArea() {
-    const message = document.getElementById("message");
-    message.textContent = "";
-    message.className = "message";
-
-    try {
-        const area = document.getElementById("playerJsonArea");
-        if (!area) return;
-        area.value = JSON.stringify(playerRegistry, null, 2);
-        message.textContent = "プレイヤーリストをJSONとして出力しました。";
-        message.classList.add("success");
-    } catch (e) {
-        console.error(e);
-        message.textContent = "プレイヤーリストのJSON出力に失敗しました。";
-        message.classList.add("error");
-    }
+// 汎用: JSON ファイルをダウンロードさせる
+function downloadJsonFile(filename, data) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 }
 
-// プレイヤーリスト JSON 読み込み
-function importPlayerRegistryFromJsonArea() {
+// 共通: JSON文字列からプレイヤーリストを復元
+function loadPlayerRegistryFromJsonText(text) {
     const message = document.getElementById("message");
-    message.textContent = "";
-    message.className = "message";
-
-    const area = document.getElementById("playerJsonArea");
-    if (!area) return;
-    const text = area.value.trim();
-    if (!text) {
-        message.textContent = "プレイヤーリストのJSONが入力されていません。";
-        message.classList.add("error");
-        return;
+    if (message) {
+        message.textContent = "";
+        message.className = "message";
     }
 
     try {
@@ -1588,26 +1632,91 @@ function importPlayerRegistryFromJsonArea() {
         if (!Array.isArray(data)) {
             throw new Error("プレイヤーリストは配列形式である必要があります。");
         }
+
         playerRegistry = data.map(raw => ({
             name: raw.name ?? "",
             note: raw.note ?? "",
             laneRanks: {
-                TOP: raw.laneRanks?.TOP ?? "",
-                JNG: raw.laneRanks?.JNG ?? "",
-                MID: raw.laneRanks?.MID ?? "",
-                ADC: raw.laneRanks?.ADC ?? "",
-                SUPPORT: raw.laneRanks?.SUPPORT ?? raw.laneRanks?.SUP ?? ""
+                TOP:      raw.laneRanks?.TOP      ?? "",
+                JNG:      raw.laneRanks?.JNG      ?? "",
+                MID:      raw.laneRanks?.MID      ?? "",
+                ADC:      raw.laneRanks?.ADC      ?? "",
+                SUPPORT:  raw.laneRanks?.SUPPORT  ?? raw.laneRanks?.SUP ?? ""
             }
         }));
+
         refreshPlayerRegistryTable();
         updatePlayerRegistrySelects();
-        message.textContent = "プレイヤーリストをJSONから読み込みました。";
-        message.classList.add("success");
+
+        if (message) {
+            message.textContent = "プレイヤーリストをJSONから読み込みました。";
+            message.classList.add("success");
+        }
     } catch (e) {
         console.error(e);
-        message.textContent = "プレイヤーリストJSONの解析に失敗しました。形式が正しいか確認してください。";
-        message.classList.add("error");
+        if (message) {
+            message.textContent = "プレイヤーリストJSONの解析に失敗しました。形式が正しいか確認してください。";
+            message.classList.add("error");
+        }
     }
+}
+
+
+// プレイヤーリスト JSON 出力（テキストエリア + ファイル保存）
+function exportPlayerRegistryToJsonArea() {
+    const message = document.getElementById("message");
+    if (message) {
+        message.textContent = "";
+        message.className = "message";
+    }
+
+    try {
+        const json = JSON.stringify(playerRegistry, null, 2);
+
+        // 一応テキストエリアにも表示（中身を見たいとき用）
+        const area = document.getElementById("playerJsonArea");
+        if (area) {
+            area.value = json;
+        }
+
+        // 日付入りのファイル名で保存
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, "0");
+        const d = String(now.getDate()).padStart(2, "0");
+        const filename = `player_registry_${y}${m}${d}.json`;
+
+        downloadJsonFile(filename, playerRegistry);
+
+        if (message) {
+            message.textContent = `プレイヤーリストをJSONファイル(${filename})として保存しました。`;
+            message.classList.add("success");
+        }
+    } catch (e) {
+        console.error(e);
+        if (message) {
+            message.textContent = "プレイヤーリストのJSON出力に失敗しました。";
+            message.classList.add("error");
+        }
+    }
+}
+
+// テキストエリアから読み込む場合（ドラッグ＆ドロップやファイル選択は loadPlayerRegistryFromJsonText を直接使用）
+function importPlayerRegistryFromJsonArea() {
+    const area = document.getElementById("playerJsonArea");
+    if (!area) return;
+
+    const text = area.value.trim();
+    if (!text) {
+        const message = document.getElementById("message");
+        if (message) {
+            message.textContent = "プレイヤーリストのJSONが入力されていません。";
+            message.classList.add("error");
+        }
+        return;
+    }
+
+    loadPlayerRegistryFromJsonText(text);
 }
 
 
