@@ -657,3 +657,20 @@ button.small {
     background: #030712;
     color: #e5e7eb;
 }
+
+/* 登録済みプレイヤーの第1〜第5希望列は細め＆中央寄せ */
+#playerRegistryTable th:nth-child(n+8):nth-child(-n+12),
+#playerRegistryTable td:nth-child(n+8):nth-child(-n+12) {
+    text-align: center;
+    padding-inline: 4px;
+    min-width: 40px;
+    max-width: 60px;
+}
+
+/* ランク列と希望レーン列の区切り線（SUP の右側） */
+#playerTable th:nth-child(8),
+#playerTable td:nth-child(8),
+#playerRegistryTable th:nth-child(8),
+#playerRegistryTable td:nth-child(8) {
+    border-left: 1px solid #4b5563;
+}
