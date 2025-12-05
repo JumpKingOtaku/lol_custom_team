@@ -55,43 +55,51 @@ const UNLISTED_PREF = 5;
 
 // モードごとの重み
 const MODES = {
+    // 通常生成：希望4 / 対面3 / 平均2 をイメージしたバランス
     normal: {
         id: "normal",
         label: "通常生成",
-        prefWeight: 10,
-        laneWeight: 2,
-        avgWeight: 3,
-        pairPrefWeight: 10,
+        prefWeight: 4,      // 希望レーンの重み（4）
+        laneWeight: 3,      // 対面ランク差の重み（3）
+        avgWeight: 2,       // チーム平均差の重み（2）
+        pairPrefWeight: 4,  // ペア希望も「希望レーン」と同じくらいの重み
         tryCount: 350
     },
+
+    // 希望レーン重視：希望の比重をかなり上げる
     pref: {
         id: "pref",
         label: "希望レーン重視",
-        prefWeight: 25,
-        laneWeight: 1,
-        avgWeight: 1,
-        pairPrefWeight: 30,
+        prefWeight: 9,      // 希望レーンを最優先
+        laneWeight: 2,      // 対面はそこそこ見る
+        avgWeight: 1,       // チーム平均はかなり緩め
+        pairPrefWeight: 9,  // ペア希望も強めに考慮
         tryCount: 450
     },
+
+    // 対面ランク重視：レーンごとの差を最優先
     lane: {
         id: "lane",
         label: "対面ランク重視",
-        prefWeight: 5,
-        laneWeight: 10,
-        avgWeight: 2,
-        pairPrefWeight: 5,
+        prefWeight: 2,      // 希望は少しだけ見る
+        laneWeight: 9,      // 対面差を最重要
+        avgWeight: 3,       // チーム平均もそこそこ見る
+        pairPrefWeight: 3,  // ペア希望は控えめ
         tryCount: 450
     },
+
+    // チーム平均重視：5人全体の平均差を最優先
     avg: {
         id: "avg",
         label: "チーム平均重視",
-        prefWeight: 5,
-        laneWeight: 2,
-        avgWeight: 10,
-        pairPrefWeight: 5,
+        prefWeight: 2,      // 希望は少しだけ
+        laneWeight: 3,      // 対面も見る
+        avgWeight: 9,       // チーム平均差を最重要
+        pairPrefWeight: 3,  // ペア希望は控えめ
         tryCount: 450
     }
 };
+
 
 // 前回結果のハッシュ（同じ組み合わせを避ける用）
 const lastAssignmentHashByMode = {
@@ -904,8 +912,341 @@ function evaluateAssignment(assignment, players, mode, constraints) {
 // =====================
 
 
+// 評価スコアの内訳を計算
+function computeScoreDetails(assignment, players, mode) {
+    if (!assignment || assignment.length !== 10) return null;
+
+    const prefWeight = mode.prefWeight ?? 10;
+    const laneWeight = mode.laneWeight ?? 2;
+    const avgWeight  = mode.avgWeight ?? 3;
+
+    let prefSum = 0;
+    const prefCountByRank = [0, 0, 0, 0, 0];        // 全体
+    const prefCountByRankBlue = [0, 0, 0, 0, 0];   // Blue 陣営
+    const prefCountByRankRed  = [0, 0, 0, 0, 0];   // Red 陣営
+
+    const teamMMR = {
+        BLUE: [],
+        RED: []
+    };
+
+    const laneMap = {
+        BLUE: {},
+        RED: {}
+    };
+
+    for (const pos of assignment) {
+        const player = players[pos.playerIndex];
+
+        // 希望順位（0=第1, 1=第2, ...）
+        const prefRankIndex = getLanePreferenceRank(player, pos.role);
+        if (Number.isFinite(prefRankIndex)) {
+            prefSum += prefRankIndex;
+            if (prefRankIndex >= 0 && prefRankIndex < prefCountByRank.length) {
+                prefCountByRank[prefRankIndex]++;
+                if (pos.team === "BLUE") {
+                    prefCountByRankBlue[prefRankIndex]++;
+                } else if (pos.team === "RED") {
+                    prefCountByRankRed[prefRankIndex]++;
+                }
+            }
+        }
+
+        // MMR
+        const mmr = getLaneMMR(player, pos.role);
+        teamMMR[pos.team].push(mmr);
+        laneMap[pos.team][pos.role] = mmr;
+    }
+
+    const perLane = [];
+    let laneDiffRawSum = 0;
+
+    for (const role of ROLES) {
+        const blueMmr = laneMap.BLUE[role];
+        const redMmr  = laneMap.RED[role];
+
+        const diffRaw = (blueMmr != null && redMmr != null)
+            ? Math.abs(blueMmr - redMmr)
+            : 0;
+
+        laneDiffRawSum += diffRaw;
+
+        perLane.push({
+            role,
+            blue: blueMmr ?? 0,
+            red:  redMmr ?? 0,
+            diffRaw
+        });
+    }
+
+    const blueAvgMMR = average(teamMMR.BLUE);
+    const redAvgMMR  = average(teamMMR.RED);
+    const avgDiffRaw = Math.abs(blueAvgMMR - redAvgMMR);
+
+    const prefPenalty = prefSum * prefWeight;
+    const lanePenalty = laneDiffRawSum * laneWeight;
+    const avgPenalty  = avgDiffRaw * avgWeight;
+    const total       = prefPenalty + lanePenalty + avgPenalty;
+
+    return {
+        total,
+        prefSum,
+        prefPenalty,
+        laneDiffRawSum,
+        lanePenalty,
+        avgDiffRaw,
+        avgPenalty,
+        perLane,
+        prefCountByRank,
+        prefCountByRankBlue,
+        prefCountByRankRed,
+        prefWeight,
+        laneWeight,
+        avgWeight,
+        blueAvgMMR,
+        redAvgMMR
+    };
+}
 
 
+// 評価スコア内訳をDOMに描画
+function renderScoreDetail(assignment, players, score) {
+    const detail = document.getElementById("scoreDetail");
+    if (!detail) return;
+
+    // currentMode があればそれを使い、なければ normal
+    const mode = (typeof currentMode !== "undefined" && currentMode) ? currentMode : MODES.normal;
+    const breakdown = computeScoreDetails(assignment, players, mode);
+    if (!breakdown) {
+        detail.innerHTML = "";
+        return;
+    }
+
+    const {
+        prefSum,
+        prefPenalty,
+        laneDiffRawSum,
+        lanePenalty,
+        avgDiffRaw,
+        avgPenalty,
+        perLane,
+        prefCountByRank,
+        prefCountByRankBlue,
+        prefCountByRankRed,
+        prefWeight,
+        laneWeight,
+        avgWeight,
+        blueAvgMMR,
+        redAvgMMR
+    } = breakdown;
+
+    // レーンごとの Blue / Red 綱引きバー
+    // 差が一番大きいレーンを 75:25 くらいまで広げる
+    const maxLaneDiff = perLane.reduce((m, r) => Math.max(m, r.diffRaw), 0) || 1;
+    const maxShiftPercent = 25; // 中心 50% から最大 ±25% → 75:25 くらい
+
+    const laneRowsHtml = perLane.map(row => {
+        let blueWidth = 50;
+        let redWidth  = 50;
+
+        const shift = (row.diffRaw / maxLaneDiff) * maxShiftPercent;
+
+        if (row.blue >= row.red) {
+            blueWidth = 50 + shift;
+            redWidth  = 50 - shift;
+        } else {
+            redWidth  = 50 + shift;
+            blueWidth = 50 - shift;
+        }
+
+        // 10%〜90% の範囲に収める（極端になり過ぎないように）
+        blueWidth = Math.min(90, Math.max(10, blueWidth));
+        redWidth  = 100 - blueWidth;
+
+        return `
+            <tr>
+                <td>${ROLE_LABELS[row.role]}</td>
+                <td>${mmrToRankLabel(row.blue)}（${row.blue.toFixed(1)}）</td>
+                <td>${mmrToRankLabel(row.red)}（${row.red.toFixed(1)}）</td>
+                <td>
+                    <div class="score-bar-outer">
+                        <div class="score-bar-inner-blue" style="width:${blueWidth}%;"></div>
+                        <div class="score-bar-inner-red" style="left:${blueWidth}%;width:${redWidth}%;"></div>
+                    </div>
+                    <span class="score-bar-label">差 ${row.diffRaw.toFixed(1)}</span>
+                </td>
+            </tr>
+        `;
+    }).join("");
+
+
+
+    // 希望レーン：Blue / Red の人数比を1本バーで
+    const prefBarsHtml = prefCountByRank.map((_, idx) => {
+        const blueCnt = prefCountByRankBlue[idx] ?? 0;
+        const redCnt  = prefCountByRankRed[idx] ?? 0;
+        const total   = blueCnt + redCnt;
+
+        const bluePercent = total > 0 ? (blueCnt / total) * 100 : 0;
+        const redPercent  = total > 0 ? (redCnt  / total) * 100 : 0;
+
+        return `
+            <div class="score-bar-row">
+                <span class="score-bar-row-label">第${idx + 1}希望</span>
+                <div class="score-bar-outer">
+                    <div class="score-bar-inner-blue" style="width:${bluePercent}%;"></div>
+                    <div class="score-bar-inner-red" style="left:${bluePercent}%;width:${redPercent}%;"></div>
+                </div>
+                <span class="score-bar-label">Blue ${blueCnt}人 / Red ${redCnt}人</span>
+            </div>
+        `;
+    }).join("");
+
+    const prefDetailHtml = `
+        <ul class="score-detail-list">
+            <li>第1希望に入っている人数: ${prefCountByRank[0]}人</li>
+            <li>第2希望: ${prefCountByRank[1]}人 / 第3希望: ${prefCountByRank[2]}人</li>
+            <li>第4希望: ${prefCountByRank[3]}人 / 第5希望: ${prefCountByRank[4]}人</li>
+            <li>希望順位の合計（0=第1希望…）: ${prefSum.toFixed(1)}</li>
+        </ul>
+    `;
+
+
+    // チーム平均ランク：Blue / Red 綱引きバー
+    // MMR差 8 以上で 75:25 くらいまで動くイメージ
+    const maxShiftAvg = 25;
+    const diffScale   = Math.min(avgDiffRaw / 8, 1); // 8 を基準に「どれだけ差があるか」
+    const shiftAvg    = diffScale * maxShiftAvg;
+
+    let avgBlueWidth = 50;
+    let avgRedWidth  = 50;
+
+    if (blueAvgMMR >= redAvgMMR) {
+        avgBlueWidth = 50 + shiftAvg;
+        avgRedWidth  = 50 - shiftAvg;
+    } else {
+        avgRedWidth  = 50 + shiftAvg;
+        avgBlueWidth = 50 - shiftAvg;
+    }
+
+    // 10%〜90% に制限
+    avgBlueWidth = Math.min(90, Math.max(10, avgBlueWidth));
+    avgRedWidth  = 100 - avgBlueWidth;
+
+    const avgBarsHtml = `
+        <div class="score-bar-row">
+            <span class="score-bar-row-label">平均</span>
+            <div class="score-bar-outer">
+                <div class="score-bar-inner-blue" style="width:${avgBlueWidth}%;"></div>
+                <div class="score-bar-inner-red" style="left:${avgBlueWidth}%;width:${avgRedWidth}%;"></div>
+            </div>
+            <span class="score-bar-label">
+                Blue ${mmrToRankLabel(blueAvgMMR)}（${blueAvgMMR.toFixed(1)}） /
+                Red ${mmrToRankLabel(redAvgMMR)}（${redAvgMMR.toFixed(1)}）
+            </span>
+        </div>
+    `;
+
+
+
+
+    // スコア内でどの要素がどれくらい効いているか（棒グラフ）
+    const maxPenalty = Math.max(prefPenalty, lanePenalty, avgPenalty, 1);
+    const scoreBarsHtml = `
+        <div class="score-bar-row">
+            <span class="score-bar-row-label">希望</span>
+            <div class="score-bar-outer">
+                <div class="score-bar-inner" style="width:${(prefPenalty / maxPenalty) * 100}%;"></div>
+            </div>
+            <span class="score-bar-label">${prefPenalty.toFixed(1)}</span>
+        </div>
+        <div class="score-bar-row">
+            <span class="score-bar-row-label">対面差</span>
+            <div class="score-bar-outer">
+                <div class="score-bar-inner" style="width:${(lanePenalty / maxPenalty) * 100}%;"></div>
+            </div>
+            <span class="score-bar-label">${lanePenalty.toFixed(1)}</span>
+        </div>
+        <div class="score-bar-row">
+            <span class="score-bar-row-label">平均差</span>
+            <div class="score-bar-outer">
+                <div class="score-bar-inner" style="width:${(avgPenalty / maxPenalty) * 100}%;"></div>
+            </div>
+            <span class="score-bar-label">${avgPenalty.toFixed(1)}</span>
+        </div>
+    `;
+
+    // DOM 出力
+    detail.innerHTML = `
+        <h3>スコア内訳</h3>
+        <p class="score-detail-summary">
+            合計スコア: ${score.toFixed(1)} =
+            希望のズレ ${prefPenalty.toFixed(1)} +
+            対面ランクの差 ${lanePenalty.toFixed(1)} +
+            チーム平均ランクの差 ${avgPenalty.toFixed(1)}
+        </p>
+
+        <div class="score-detail-grid">
+            <div class="score-detail-block">
+                <h4>希望レーン</h4>
+                <p class="score-detail-note">
+                    希望順位（第1〜第5）の合計が小さいほど「希望通り」に近い編成です。<br>
+                    下の棒グラフは、第◯希望にいるプレイヤーの Blue / Red 比率を表しています。
+                </p>
+                ${prefDetailHtml}
+                <div class="score-pref-bars">
+                    ${prefBarsHtml}
+                </div>
+            </div>
+
+            <div class="score-detail-block">
+                <h4>チーム平均ランク</h4>
+                <ul class="score-detail-list">
+                    <li>Blue 平均: ${mmrToRankLabel(blueAvgMMR)}（MMR: ${blueAvgMMR.toFixed(1)}）</li>
+                    <li>Red 平均: ${mmrToRankLabel(redAvgMMR)}（MMR: ${redAvgMMR.toFixed(1)}）</li>
+                    <li>MMR差: ${avgDiffRaw.toFixed(1)} / この差によるスコアへの影響: ${avgPenalty.toFixed(1)}</li>
+                </ul>
+                <div class="score-avg-bars">
+                    ${avgBarsHtml}
+                </div>
+            </div>
+        </div>
+
+        <div class="score-detail-block score-detail-block-full">
+            <h4>スコア構成</h4>
+            <p class="score-detail-note">
+                棒グラフが長いほど、その要素が合計スコアに与えている影響が大きいです。
+            </p>
+            ${scoreBarsHtml}
+        </div>
+
+        <div class="score-detail-block score-detail-block-full">
+            <h4>レーンごとの対面ランク差</h4>
+            <p class="score-detail-note">
+                青と赤の長さの差が、そのレーンでどちらのチームが有利かを表しています。<br>
+                全レーン差の合計: ${laneDiffRawSum.toFixed(1)} / スコアへの影響: ${lanePenalty.toFixed(1)}
+            </p>
+            <table class="score-detail-table">
+                <thead>
+                    <tr>
+                        <th>レーン</th>
+                        <th>Blue</th>
+                        <th>Red</th>
+                        <th>MMR差</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${laneRowsHtml}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+
+
+
+// 実際の結果描画
 function showResult(assignment, players, score) {
     const blueList = document.getElementById("blueList");
     const redList = document.getElementById("redList");
@@ -993,6 +1334,9 @@ function showResult(assignment, players, score) {
     redAverage.textContent = `平均ランク: ${mmrToRankLabel(redAvg)}（MMR: ${redAvg.toFixed(1)}）`;
 
     scoreValue.textContent = score.toFixed(1);
+
+    // ★ ここで内訳を描画
+    renderScoreDetail(assignment, players, score);
 
     // チーム結果エリア表示
     resultSection.classList.remove("hidden");
