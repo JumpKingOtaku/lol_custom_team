@@ -102,6 +102,16 @@ const lastAssignmentHashByMode = {
     random: null
 };
 
+// 直近のチーム結果（ドラッグ＆ドロップ用）
+let currentAssignment = null;
+let currentPlayers = null;
+let currentModeForScore = MODES.normal;
+let currentConstraints = null;
+let currentScore = null;
+
+// 結果エリアのドラッグ対象
+let draggedResultSlot = null;
+
 // 希望レーン select 用クラス一覧
 const PREF_SELECT_CLASSES = [
     "pref-select-TOP",
@@ -715,7 +725,14 @@ function generateTeams(mode) {
 
     lastAssignmentHashByMode[modeKey] = assignmentHash(chosen.assignment);
 
-    showResult(chosen.assignment, players, chosen.score);
+    // ★ ドラッグ＆ドロップ用に現在の状態を保持
+    currentAssignment = chosen.assignment.map(pos => ({ ...pos }));
+    currentPlayers = players;
+    currentModeForScore = mode;
+    currentConstraints = constraints;
+    currentScore = chosen.score;
+
+    showResult(currentAssignment, currentPlayers, currentScore);
 
     message.textContent = `${mode.label}モードでチームを生成しました。（再度押すと別パターンを再生成しやすくなっています）`;
     message.classList.add("success");
@@ -886,6 +903,9 @@ function evaluateAssignment(assignment, players, mode, constraints) {
 // 結果表示
 // =====================
 
+
+
+
 function showResult(assignment, players, score) {
     const blueList = document.getElementById("blueList");
     const redList = document.getElementById("redList");
@@ -903,6 +923,10 @@ function showResult(assignment, players, score) {
     const blueAssignments = [];
     const redAssignments = [];
 
+    // 現在の assignment をグローバルにも保持しておく
+    currentAssignment = assignment.map(pos => ({ ...pos }));
+    currentPlayers = players;
+
     for (const pos of assignment) {
         if (pos.team === "BLUE") {
             blueAssignments.push(pos);
@@ -914,6 +938,7 @@ function showResult(assignment, players, score) {
     blueAssignments.sort((a, b) => ROLES.indexOf(a.role) - ROLES.indexOf(b.role));
     redAssignments.sort((a, b) => ROLES.indexOf(a.role) - ROLES.indexOf(b.role));
 
+    // BLUE
     for (const pos of blueAssignments) {
         const player = players[pos.playerIndex];
         const mmr = getLaneMMR(player, pos.role);
@@ -924,6 +949,10 @@ function showResult(assignment, players, score) {
         const prefText = prefRank != null ? ` / 第${prefRank}希望` : "";
 
         const li = document.createElement("li");
+        li.classList.add("team-player");
+        li.dataset.team = pos.team;
+        li.dataset.role = pos.role;
+        li.dataset.playerIndex = String(pos.playerIndex);
         li.innerHTML = `
             <span class="team-role">${ROLE_LABELS[pos.role]}</span>
             <span class="team-name">${player.name}</span>
@@ -933,6 +962,7 @@ function showResult(assignment, players, score) {
         blueList.appendChild(li);
     }
 
+    // RED
     for (const pos of redAssignments) {
         const player = players[pos.playerIndex];
         const mmr = getLaneMMR(player, pos.role);
@@ -943,6 +973,10 @@ function showResult(assignment, players, score) {
         const prefText = prefRank != null ? ` / 第${prefRank}希望` : "";
 
         const li = document.createElement("li");
+        li.classList.add("team-player");
+        li.dataset.team = pos.team;
+        li.dataset.role = pos.role;
+        li.dataset.playerIndex = String(pos.playerIndex);
         li.innerHTML = `
             <span class="team-role">${ROLE_LABELS[pos.role]}</span>
             <span class="team-name">${player.name}</span>
@@ -960,8 +994,138 @@ function showResult(assignment, players, score) {
 
     scoreValue.textContent = score.toFixed(1);
 
+    // チーム結果エリア表示
     resultSection.classList.remove("hidden");
+
+    // ★ チーム結果のドラッグ＆ドロップを有効化
+    attachTeamPlayerDragEvents();
 }
+
+
+// ==============================
+// チーム分け結果のドラッグ＆ドロップ
+// ==============================
+
+// 現在の assignment から指定スロットの index を探す
+function findAssignmentIndexInCurrent(team, role) {
+    if (!currentAssignment) return -1;
+    return currentAssignment.findIndex(
+        pos => pos.team === team && pos.role === role
+    );
+}
+
+// DOM イベントの紐付け
+function attachTeamPlayerDragEvents() {
+    const items = document.querySelectorAll("#blueList .team-player, #redList .team-player");
+    items.forEach(li => {
+        li.draggable = true;
+        li.addEventListener("dragstart", onTeamPlayerDragStart);
+        li.addEventListener("dragend", onTeamPlayerDragEnd);
+        li.addEventListener("dragover", onTeamPlayerDragOver);
+        li.addEventListener("dragleave", onTeamPlayerDragLeave); // ★ 追加
+        li.addEventListener("drop", onTeamPlayerDrop);
+    });
+}
+
+
+function onTeamPlayerDragStart(event) {
+    draggedResultSlot = event.currentTarget;
+    if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = "move";
+        try {
+            event.dataTransfer.setData("text/plain", "");
+        } catch (e) {
+            // Safari 対策など、失敗しても無視
+        }
+    }
+    draggedResultSlot.classList.add("dragging");
+}
+
+function onTeamPlayerDragEnd() {
+    if (draggedResultSlot) {
+        draggedResultSlot.classList.remove("dragging");
+        draggedResultSlot = null;
+    }
+}
+
+function onTeamPlayerDragOver(event) {
+    // drop を許可
+    event.preventDefault();
+
+    const target = event.currentTarget;
+    // 自分自身はハイライトしない
+    if (!draggedResultSlot || draggedResultSlot === target) return;
+
+    // 相手にハイライトクラスを付与
+    target.classList.add("drop-target");
+}
+
+function onTeamPlayerDragLeave(event) {
+    const target = event.currentTarget;
+    target.classList.remove("drop-target");
+}
+
+
+function onTeamPlayerDrop(event) {
+    event.preventDefault();
+    const target = event.currentTarget;
+
+    if (!draggedResultSlot || draggedResultSlot === target) return;
+    if (!currentAssignment || !currentPlayers) return;
+
+    // すべてのハイライトを一旦クリア
+    document
+        .querySelectorAll("#blueList .team-player, #redList .team-player")
+        .forEach(li => li.classList.remove("drop-target"));
+
+    const teamA = draggedResultSlot.dataset.team;
+    const roleA = draggedResultSlot.dataset.role;
+    const teamB = target.dataset.team;
+    const roleB = target.dataset.role;
+
+    const idxA = findAssignmentIndexInCurrent(teamA, roleA);
+    const idxB = findAssignmentIndexInCurrent(teamB, roleB);
+    if (idxA === -1 || idxB === -1) return;
+
+    // スロット（team+role）は固定で、担当プレイヤーだけを入れ替える
+    const tmpPlayerIndex = currentAssignment[idxA].playerIndex;
+    currentAssignment[idxA].playerIndex = currentAssignment[idxB].playerIndex;
+    currentAssignment[idxB].playerIndex = tmpPlayerIndex;
+
+    draggedResultSlot.classList.remove("dragging");
+    draggedResultSlot = null;
+
+    recalcAndRedrawFromCurrentAssignment();
+}
+
+// 並び替え後にスコアなどを再計算して描画し直す
+function recalcAndRedrawFromCurrentAssignment() {
+    if (!currentAssignment || !currentPlayers) return;
+
+    const mode = currentModeForScore || MODES.normal;
+    const constraints = currentConstraints;
+    const newScore = evaluateAssignment(currentAssignment, currentPlayers, mode, constraints);
+
+    const message = document.getElementById("message");
+
+    if (!Number.isFinite(newScore)) {
+        if (message) {
+            message.textContent = "この並び替えでは条件を満たせないためスコアを計算できません（レーン構成や詳細設定を確認してください）。";
+            message.className = "message error";
+        }
+        return;
+    }
+
+    if (message && message.classList.contains("error")
+        && message.textContent.startsWith("この並び替えでは条件を満たせない")) {
+        message.textContent = "";
+        message.className = "message";
+    }
+
+    currentScore = newScore;
+    showResult(currentAssignment, currentPlayers, currentScore);
+}
+
 
 
 // =====================
@@ -1022,7 +1186,14 @@ function generateTeamsRandom() {
 
     lastAssignmentHashByMode["random"] = assignmentHash(chosen.assignment);
 
-    showResult(chosen.assignment, players, chosen.score);
+    // ランダムモードでも、以降のドラッグ編集用に保持しておく
+    currentAssignment = chosen.assignment.map(pos => ({ ...pos }));
+    currentPlayers = players;
+    currentModeForScore = MODES.normal;  // ランダムは「通常」と同じ重みで評価
+    currentConstraints = constraints;
+    currentScore = chosen.score;
+
+    showResult(currentAssignment, currentPlayers, currentScore);
 
     message.textContent = "希望レーン内で完全ランダムにチームを生成しました。";
     message.classList.add("success");
