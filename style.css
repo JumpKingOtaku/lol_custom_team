@@ -277,9 +277,160 @@ button.small {
     font-size: 13px;
 }
 
+/* 評価スコアの内訳表示エリア */
+.score-detail {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: #020617;
+    border: 1px solid #1f2937;
+    font-size: 12px;
+}
+
+.score-detail h3 {
+    margin: 0 0 6px;
+    font-size: 13px;
+}
+
+.score-detail h4 {
+    margin: 6px 0 4px;
+    font-size: 12px;
+}
+
+.score-detail-summary {
+    margin: 0 0 8px;
+    font-size: 12px;
+}
+
+.score-detail-note {
+    margin: 0 0 4px;
+    font-size: 11px;
+    color: #9ca3af;
+}
+
+.score-detail-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.score-detail-block {
+    flex: 1 1 240px;
+    background: #030712;
+    border-radius: 8px;
+    padding: 6px 8px;
+    border: 1px solid #1f2937;
+}
+
+.score-detail-block-full {
+    margin-top: 4px;
+}
+
+.score-detail-list {
+    margin: 0;
+    padding-left: 16px;
+}
+
+.score-detail-list li {
+    margin: 2px 0;
+}
+
+/* レーンごとの棒グラフ付きテーブル */
+.score-detail-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+}
+
+.score-detail-table th,
+.score-detail-table td {
+    border-bottom: 1px solid #1f2937;
+    padding: 4px 6px;
+    text-align: left;
+}
+
+.score-detail-table th:nth-child(1),
+.score-detail-table td:nth-child(1) {
+    width: 60px;
+}
+
+.score-detail-table th:nth-child(4),
+.score-detail-table td:nth-child(4) {
+    width: 160px;
+}
+
+/* 棒グラフ（横棒） */
+.score-bar-outer {
+    position: relative;
+    display: inline-block;
+    width: 110px;
+    max-width: 150px;
+    height: 6px;
+    border-radius: 999px;
+    background: #111827;
+    margin-right: 4px;
+    vertical-align: middle;
+    overflow: hidden;
+}
+
+/* 単色バー（スコア構成用など） */
+.score-bar-inner {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    border-radius: 999px;
+    background: #facc15;
+}
+
+/* 青赤の割合バー用 */
+.score-bar-inner-blue,
+.score-bar-inner-red {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    border-radius: 999px;
+}
+
+.score-bar-inner-blue {
+    left: 0;
+    background: #3b82f6; /* Blue */
+}
+
+.score-bar-inner-red {
+    background: #ef4444; /* Red */
+}
+
+.score-bar-label {
+    font-size: 11px;
+    vertical-align: middle;
+}
+
+/* 棒グラフ1行分（ラベル＋バー＋数値） */
+.score-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 2px 0;
+}
+
+.score-bar-row-label {
+    width: 60px;
+    font-size: 11px;
+}
+
+
+/* 希望人数・平均ランクのグラフ用コンテナ */
+.score-pref-bars,
+.score-avg-bars {
+    margin-top: 4px;
+}
+
 .hidden {
     display: none;
 }
+
 
 /* 名前 + 一括ランク + プレイヤー選択 */
 .name-cell {
