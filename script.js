@@ -100,6 +100,115 @@ const MODES = {
     }
 };
 
+// =====================
+// 結果の履歴（localStorage）
+// =====================
+const STORAGE_KEY_LAST_RESULTS = "lolTeamTool_lastResults";
+
+let resultHistory = {
+    current: null,
+    previous: null
+};
+
+let isRestoringFromHistory = false;
+
+function saveResultHistory(assignment, players, modeId, score) {
+    if (isRestoringFromHistory) {
+        return; // 「前の結果に戻す」実行中は履歴更新しない
+    }
+
+    const previous = resultHistory.current
+        ? {
+            assignment: resultHistory.current.assignment,
+            players: resultHistory.current.players,
+            modeId: resultHistory.current.modeId,
+            score: resultHistory.current.score
+        }
+        : null;
+
+    resultHistory.current = { assignment, players, modeId, score };
+    resultHistory.previous = previous;
+
+    try {
+        localStorage.setItem(STORAGE_KEY_LAST_RESULTS, JSON.stringify(resultHistory));
+    } catch (e) {
+        console.error("failed to save history", e);
+    }
+    updateUndoButtonState(resultHistory.previous);
+}
+
+function loadResultHistoryOnStartup() {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY_LAST_RESULTS);
+        if (!raw) {
+            updateUndoButtonState(null);
+            return;
+        }
+        const data = JSON.parse(raw);
+        resultHistory.current = data.current || null;
+        resultHistory.previous = data.previous || null;
+        updateUndoButtonState(resultHistory.previous);
+
+        if (resultHistory.current) {
+            applySavedResult(resultHistory.current);
+        }
+    } catch (e) {
+        console.error("failed to load history", e);
+        updateUndoButtonState(null);
+    }
+}
+
+function applySavedResult(entry) {
+    if (!entry) return;
+    isRestoringFromHistory = true;
+
+    if (typeof currentMode !== "undefined" && currentMode && entry.modeId) {
+        currentMode = MODES[entry.modeId] || currentMode;
+    }
+
+    // showResult の中で saveResultHistory が呼ばれるが、
+    // isRestoringFromHistory フラグで履歴は更新されない
+    showResult(entry.assignment, entry.players, entry.score);
+
+    isRestoringFromHistory = false;
+}
+
+function updateUndoButtonState(previous) {
+    const btn = document.getElementById("undoResultButton");
+    if (!btn) return;
+    const enabled = !!previous;
+    btn.disabled = !enabled;
+    btn.classList.toggle("disabled", !enabled);
+}
+
+function setupUndoButton() {
+    const btn = document.getElementById("undoResultButton");
+    if (!btn) return;
+
+    btn.addEventListener("click", () => {
+        if (!resultHistory.previous) return;
+
+        const prev = resultHistory.previous;
+
+        // 1つ前の結果を current にして、それより前は捨てる（1段階だけ戻れる）
+        resultHistory.current = prev;
+        resultHistory.previous = null;
+
+        try {
+            localStorage.setItem(STORAGE_KEY_LAST_RESULTS, JSON.stringify(resultHistory));
+        } catch (e) {
+            console.error("failed to save history", e);
+        }
+        updateUndoButtonState(resultHistory.previous);
+        applySavedResult(prev);
+    });
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+    setupUndoButton();
+    loadResultHistoryOnStartup();
+});
+
 
 // 前回結果のハッシュ（同じ組み合わせを避ける用）
 const lastAssignmentHashByMode = {
@@ -1248,6 +1357,13 @@ function renderScoreDetail(assignment, players, score) {
 
 // 実際の結果描画
 function showResult(assignment, players, score) {
+
+	// 新しい結果を履歴に保存（ブラウザを閉じても保持）
+    const modeId = (typeof currentMode !== "undefined" && currentMode && currentMode.id)
+    ? currentMode.id
+    : "normal";
+    saveResultHistory(assignment, players, modeId, score);
+
     const blueList = document.getElementById("blueList");
     const redList = document.getElementById("redList");
     const blueAverage = document.getElementById("blueAverage");
