@@ -1353,8 +1353,6 @@ function renderScoreDetail(assignment, players, score) {
 }
 
 
-
-
 // 実際の結果描画
 function showResult(assignment, players, score) {
 
@@ -2654,3 +2652,4 @@ function assignmentHash(assignment) {
         .join("|");
     return normalized;
 }
+
