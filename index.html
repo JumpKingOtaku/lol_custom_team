@@ -283,17 +283,29 @@
                 <ul id="redList" class="team-list"></ul>
             </div>
         </div>
-        <p class="score-info">
-            評価スコア（小さいほどバランスが良い）: <span id="scoreValue"></span>
-
-            	<button id="undoResultButton" class="undo-result-button" type="button">
-                直前の結果に戻す
-                </button>
-        </p>
 
 
-    <!-- ★ 評価スコアの内訳表示エリアを追加 -->
-    <div id="scoreDetail" class="score-detail"></div>
+<div class="score-info">
+    評価スコア（小さいほどバランスが良い）: <span id="scoreValue">-</span>
+    <span class="history-controls">
+        <button id="historyPrevButton" class="history-button" type="button">◀</button>
+        <span id="historyIndicator" class="history-indicator">-/-</span>
+        <button id="historyNextButton" class="history-button" type="button">▶</button>
+    </span>
+
+    <span class="favorite-controls">
+        お気に入り:
+        <button id="favoriteSlot1" class="favorite-button" type="button">☆1</button>
+        <button id="favoriteSlot2" class="favorite-button" type="button">☆2</button>
+        <button id="favoriteSlot3" class="favorite-button" type="button">☆3</button>
+        <button id="favoriteResetButton" class="favorite-reset-button" type="button">リセット</button>
+    </span>
+
+
+</div>
+<div id="scoreDetail" class="score-detail"></div>
+
+
 
     </section>
 
