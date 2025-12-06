@@ -229,11 +229,13 @@ button.small {
 }
 
 .team-list li {
-    margin-bottom: 4px;
-    padding: 4px 6px;
-    border-radius: 6px;
-    background: rgba(15, 23, 42, 0.25);
+    margin-bottom: 6px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: rgba(15, 23, 42, 0.35);
+    line-height: 1.5;
 }
+
 
 .team-list li.dragging {
     opacity: 0.6;
@@ -248,18 +250,28 @@ button.small {
 }
 
 .team-role {
-    font-weight: 600;
-    margin-right: 4px;
+    display: inline-block;
+    min-width: 46px;
+    font-weight: 700;
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.8);
+    text-align: center;
+    margin-right: 8px;
 }
 
 .team-name {
-    margin-right: 4px;
+    font-weight: 600;
+    font-size: 14px;
+    margin-right: 8px;
 }
 
 .team-rank {
     font-size: 12px;
-    opacity: 0.95;
+    opacity: 0.9;
 }
+
 
 .team-pref-rank {
     font-size: 11px;
@@ -269,16 +281,25 @@ button.small {
 
 .team-note {
     font-size: 11px;
-    opacity: 0.9;
+    opacity: 0.85;
+    margin-top: 2px;
+    padding-left: 56px;  /* レーンバッジ分ずらして名前と揃える */
 }
+
 
 .score-info {
     margin-top: 12px;
     font-size: 13px;
 }
 
-.undo-result-button {
+.history-controls {
     margin-left: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.history-button {
     padding: 2px 8px;
     font-size: 11px;
     border-radius: 999px;
@@ -288,15 +309,23 @@ button.small {
     cursor: pointer;
 }
 
-.undo-result-button.disabled,
-.undo-result-button:disabled {
+.history-button.disabled,
+.history-button:disabled {
     opacity: 0.4;
     cursor: default;
 }
 
-.undo-result-button:hover:not(:disabled) {
+.history-button:hover:not(:disabled) {
     background: #1f2937;
 }
+
+.history-indicator {
+    font-size: 11px;
+    color: #9ca3af;
+    min-width: 32px;
+    text-align: center;
+}
+
 
 
 /* 評価スコアの内訳表示エリア */
@@ -866,5 +895,47 @@ button.small {
     height: 16px;
     margin-left: 4px;
     vertical-align: middle;
+}
+
+.favorite-controls {
+    margin-left: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: #9ca3af;
+}
+
+.favorite-button {
+    padding: 2px 6px;
+    font-size: 11px;
+    border-radius: 999px;
+    border: 1px solid #4b5563;
+    background: #111827;
+    color: #e5e7eb;
+    cursor: pointer;
+}
+
+.favorite-button.filled {
+    border-color: #facc15;
+    color: #facc15;
+}
+
+.favorite-button:hover {
+    background: #1f2937;
+}
+
+.favorite-reset-button {
+    padding: 2px 8px;
+    font-size: 11px;
+    border-radius: 999px;
+    border: 1px solid #6b7280;
+    background: #111827;
+    color: #9ca3af;
+    cursor: pointer;
+}
+
+.favorite-reset-button:hover {
+    background: #1f2937;
 }
 
