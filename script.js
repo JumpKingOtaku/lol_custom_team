@@ -100,70 +100,220 @@ const MODES = {
     }
 };
 
+
 // =====================
-// 結果の履歴（localStorage）
+// 結果の履歴（localStorage・最大5件）
 // =====================
-const STORAGE_KEY_LAST_RESULTS = "lolTeamTool_lastResults";
+const STORAGE_KEY_LAST_RESULTS = "lolTeamTool_lastResults_v2";
 
 let resultHistory = {
-    current: null,
-    previous: null
+    list: [],   // [{assignment, players, modeId, score}, ...]
+    index: -1   // 現在表示しているインデックス
 };
 
 let isRestoringFromHistory = false;
 
+// 新しい結果を履歴に追加
 function saveResultHistory(assignment, players, modeId, score) {
-    if (isRestoringFromHistory) {
-        return; // 「前の結果に戻す」実行中は履歴更新しない
+    if (isRestoringFromHistory) return;
+
+    const entry = { assignment, players, modeId, score };
+
+    // 途中の結果から新しい生成をした場合は、その先の履歴を捨てる
+    if (resultHistory.list.length && resultHistory.index < resultHistory.list.length - 1) {
+        resultHistory.list = resultHistory.list.slice(0, resultHistory.index + 1);
     }
 
-    const previous = resultHistory.current
-        ? {
-            assignment: resultHistory.current.assignment,
-            players: resultHistory.current.players,
-            modeId: resultHistory.current.modeId,
-            score: resultHistory.current.score
-        }
-        : null;
+    resultHistory.list.push(entry);
 
-    resultHistory.current = { assignment, players, modeId, score };
-    resultHistory.previous = previous;
+    // 最大5件を維持（古いものから削る）
+    if (resultHistory.list.length > 5) {
+        const overflow = resultHistory.list.length - 5;
+        resultHistory.list.splice(0, overflow);
+    }
+
+    resultHistory.index = resultHistory.list.length - 1;
 
     try {
         localStorage.setItem(STORAGE_KEY_LAST_RESULTS, JSON.stringify(resultHistory));
     } catch (e) {
         console.error("failed to save history", e);
     }
-    updateUndoButtonState(resultHistory.previous);
+
+    updateHistoryButtons();
 }
 
+
+// =====================
+// お気に入り結果（localStorage・最大3件）
+// =====================
+const STORAGE_KEY_FAVORITE_RESULTS = "lolTeamTool_favorites_v1";
+
+// [null or {assignment, players, modeId, score}, ...] を3件まで
+let favoriteResults = [null, null, null];
+
+function saveFavoriteResultsToStorage() {
+    try {
+        localStorage.setItem(STORAGE_KEY_FAVORITE_RESULTS, JSON.stringify(favoriteResults));
+    } catch (e) {
+        console.error("failed to save favorites", e);
+    }
+}
+
+function loadFavoriteResultsOnStartup() {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY_FAVORITE_RESULTS);
+        if (!raw) {
+            updateFavoriteButtons();
+            return;
+        }
+        const data = JSON.parse(raw);
+        if (Array.isArray(data)) {
+            // 3件分だけ使う
+            favoriteResults = [data[0] || null, data[1] || null, data[2] || null];
+        } else {
+            favoriteResults = [null, null, null];
+        }
+    } catch (e) {
+        console.error("failed to load favorites", e);
+        favoriteResults = [null, null, null];
+    }
+    updateFavoriteButtons();
+}
+
+function updateFavoriteButtons() {
+    for (let i = 0; i < 3; i++) {
+        const btn = document.getElementById(`favoriteSlot${i + 1}`);
+        if (!btn) continue;
+        const fav = favoriteResults[i];
+        if (fav) {
+            btn.textContent = `★${i + 1}`;
+            const scoreText = typeof fav.score === "number" ? fav.score.toFixed(1) : "-";
+            btn.title = `お気に入り${i + 1}を表示（スコア: ${scoreText}）`;
+            btn.classList.add("filled");
+        } else {
+            btn.textContent = `☆${i + 1}`;
+            btn.title = `お気に入り${i + 1}として現在の結果を保存`;
+            btn.classList.remove("filled");
+        }
+    }
+}
+
+function applyFavoriteResult(index) {
+    const fav = favoriteResults[index];
+    if (!fav) return;
+
+    isRestoringFromHistory = true;
+
+    if (typeof currentMode !== "undefined" && fav.modeId && MODES[fav.modeId]) {
+        currentMode = MODES[fav.modeId];
+    }
+
+    // 履歴を増やさずに表示だけ行う
+    showResult(fav.assignment, fav.players, fav.score);
+
+    isRestoringFromHistory = false;
+}
+
+
+function setupFavoriteButtons() {
+    // スロット1〜3のクリック
+    for (let i = 0; i < 3; i++) {
+        const btn = document.getElementById(`favoriteSlot${i + 1}`);
+        if (!btn) continue;
+
+        btn.dataset.slotIndex = String(i);
+
+        btn.addEventListener("click", () => {
+            const idx = Number(btn.dataset.slotIndex);
+            const fav = favoriteResults[idx];
+
+            // 現在表示している結果（履歴の現在位置）を取得
+            const currentEntry =
+                resultHistory.index >= 0
+                    ? resultHistory.list[resultHistory.index]
+                    : null;
+
+            if (!fav) {
+                // 空きスロット：現在の結果を保存（ダイアログなし）
+                if (!currentEntry) return;
+                favoriteResults[idx] = {
+                    assignment: currentEntry.assignment,
+                    players: currentEntry.players,
+                    modeId: currentEntry.modeId,
+                    score: currentEntry.score
+                };
+                saveFavoriteResultsToStorage();
+                updateFavoriteButtons();
+            } else {
+                // 既に入っているスロット：登録済みのお気に入りを表示するだけ
+                applyFavoriteResult(idx);
+            }
+        });
+    }
+
+    // 「お気に入りリセット」ボタン（確認なしで即リセット）
+    const resetBtn = document.getElementById("favoriteResetButton");
+    if (resetBtn) {
+        resetBtn.addEventListener("click", () => {
+            favoriteResults = [null, null, null];
+            saveFavoriteResultsToStorage();
+            updateFavoriteButtons();
+        });
+    }
+}
+
+
+// 起動時に履歴を読み込み＆最後の結果を復元
 function loadResultHistoryOnStartup() {
     try {
         const raw = localStorage.getItem(STORAGE_KEY_LAST_RESULTS);
         if (!raw) {
-            updateUndoButtonState(null);
+            updateHistoryButtons();
             return;
         }
         const data = JSON.parse(raw);
-        resultHistory.current = data.current || null;
-        resultHistory.previous = data.previous || null;
-        updateUndoButtonState(resultHistory.previous);
+        if (Array.isArray(data.list)) {
+            resultHistory.list = data.list;
+            if (typeof data.index === "number") {
+                resultHistory.index = data.index;
+            } else {
+                resultHistory.index = data.list.length - 1;
+            }
+        } else {
+            resultHistory.list = [];
+            resultHistory.index = -1;
+        }
 
-        if (resultHistory.current) {
-            applySavedResult(resultHistory.current);
+        // index が範囲外になっていないか調整
+        if (resultHistory.list.length === 0) {
+            resultHistory.index = -1;
+        } else if (resultHistory.index < 0 || resultHistory.index >= resultHistory.list.length) {
+            resultHistory.index = resultHistory.list.length - 1;
+        }
+
+        updateHistoryButtons();
+
+        if (resultHistory.index >= 0) {
+            applySavedResultAt(resultHistory.index);
         }
     } catch (e) {
         console.error("failed to load history", e);
-        updateUndoButtonState(null);
+        resultHistory.list = [];
+        resultHistory.index = -1;
+        updateHistoryButtons();
     }
 }
 
-function applySavedResult(entry) {
+// 指定インデックスの結果を画面に反映
+function applySavedResultAt(index) {
+    const entry = resultHistory.list[index];
     if (!entry) return;
+
     isRestoringFromHistory = true;
 
-    if (typeof currentMode !== "undefined" && currentMode && entry.modeId) {
-        currentMode = MODES[entry.modeId] || currentMode;
+    if (typeof currentMode !== "undefined" && entry.modeId && MODES[entry.modeId]) {
+        currentMode = MODES[entry.modeId];
     }
 
     // showResult の中で saveResultHistory が呼ばれるが、
@@ -173,41 +323,72 @@ function applySavedResult(entry) {
     isRestoringFromHistory = false;
 }
 
-function updateUndoButtonState(previous) {
-    const btn = document.getElementById("undoResultButton");
-    if (!btn) return;
-    const enabled = !!previous;
-    btn.disabled = !enabled;
-    btn.classList.toggle("disabled", !enabled);
+// ボタンの活性/非活性＆インジケータ更新
+function updateHistoryButtons() {
+    const prevBtn = document.getElementById("historyPrevButton");
+    const nextBtn = document.getElementById("historyNextButton");
+    const indicator = document.getElementById("historyIndicator");
+    if (!prevBtn || !nextBtn || !indicator) return;
+
+    const len = resultHistory.list.length;
+    const idx = resultHistory.index;
+
+    const hasPrev = idx > 0;
+    const hasNext = idx >= 0 && idx < len - 1;
+
+    prevBtn.disabled = !hasPrev;
+    nextBtn.disabled = !hasNext;
+    prevBtn.classList.toggle("disabled", !hasPrev);
+    nextBtn.classList.toggle("disabled", !hasNext);
+
+    if (len === 0 || idx < 0) {
+        indicator.textContent = "-/-";
+    } else {
+        indicator.textContent = `${idx + 1}/${len}`;
+    }
 }
 
-function setupUndoButton() {
-    const btn = document.getElementById("undoResultButton");
-    if (!btn) return;
+// ← → ボタンのイベント登録
+function setupHistoryButtons() {
+    const prevBtn = document.getElementById("historyPrevButton");
+    const nextBtn = document.getElementById("historyNextButton");
+    if (!prevBtn || !nextBtn) return;
 
-    btn.addEventListener("click", () => {
-        if (!resultHistory.previous) return;
-
-        const prev = resultHistory.previous;
-
-        // 1つ前の結果を current にして、それより前は捨てる（1段階だけ戻れる）
-        resultHistory.current = prev;
-        resultHistory.previous = null;
-
-        try {
-            localStorage.setItem(STORAGE_KEY_LAST_RESULTS, JSON.stringify(resultHistory));
-        } catch (e) {
-            console.error("failed to save history", e);
+    prevBtn.addEventListener("click", () => {
+        if (resultHistory.index > 0) {
+            resultHistory.index--;
+            try {
+                localStorage.setItem(STORAGE_KEY_LAST_RESULTS, JSON.stringify(resultHistory));
+            } catch (e) {
+                console.error("failed to save history", e);
+            }
+            updateHistoryButtons();
+            applySavedResultAt(resultHistory.index);
         }
-        updateUndoButtonState(resultHistory.previous);
-        applySavedResult(prev);
+    });
+
+    nextBtn.addEventListener("click", () => {
+        if (resultHistory.index >= 0 && resultHistory.index < resultHistory.list.length - 1) {
+            resultHistory.index++;
+            try {
+                localStorage.setItem(STORAGE_KEY_LAST_RESULTS, JSON.stringify(resultHistory));
+            } catch (e) {
+                console.error("failed to save history", e);
+            }
+            updateHistoryButtons();
+            applySavedResultAt(resultHistory.index);
+        }
     });
 }
 
 window.addEventListener("DOMContentLoaded", () => {
-    setupUndoButton();
+    setupHistoryButtons();
     loadResultHistoryOnStartup();
+
+    setupFavoriteButtons();
+    loadFavoriteResultsOnStartup();
 });
+
 
 
 // 前回結果のハッシュ（同じ組み合わせを避ける用）
@@ -257,7 +438,18 @@ document.addEventListener("DOMContentLoaded", () => {
     updatePlayerRegistrySelects();
     refreshPlayerRegistryTable();
 
+    // 入力内容の自動保存（10人分）＋復元
+    if (typeof setupPlayerInputAutoSave === "function") {
+        setupPlayerInputAutoSave();
+    }
+
+    // プレイヤーリスト（登録済みプレイヤー）の復元
+    if (typeof restorePlayerRegistryFromStorage === "function") {
+        restorePlayerRegistryFromStorage();
+    }
+
     // 生成ボタン
+
     document.getElementById("btnNormal")
         .addEventListener("click", () => generateTeams(MODES.normal));
     document.getElementById("btnPref")
@@ -456,14 +648,21 @@ function buildPlayerTable() {
                 if (typeof refreshAdvancedSettingsSelects === "function") {
                     refreshAdvancedSettingsSelects();
                 }
+                if (typeof savePlayerInputsToStorage === "function") {
+                    savePlayerInputsToStorage();
+                }
                 return;
             }
 
             const regIndex = parseInt(val, 10);
             if (!Number.isNaN(regIndex)) {
                 applyRegistryPlayerToRow(regIndex, i);
+                if (typeof savePlayerInputsToStorage === "function") {
+                    savePlayerInputsToStorage();
+                }
             }
         });
+
 
 
         registryRow.appendChild(registrySelect);
@@ -693,6 +892,51 @@ ROLES.forEach(role => {
     }
 }
 
+
+// =====================
+// プレイヤー入力内容の保存 / 復元（localStorage）
+// =====================
+
+const STORAGE_KEY_PLAYER_INPUTS = "lolTeamTool_playerInputs_v1";
+
+function savePlayerInputsToStorage() {
+    try {
+        const snapshot = getInputSnapshot();
+        localStorage.setItem(
+            STORAGE_KEY_PLAYER_INPUTS,
+            JSON.stringify(snapshot)
+        );
+    } catch (e) {
+        console.error("failed to save player inputs", e);
+    }
+}
+
+function loadPlayerInputsFromStorage() {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY_PLAYER_INPUTS);
+        if (!raw) return;
+        const snapshot = JSON.parse(raw);
+        applyInputSnapshot(snapshot);
+    } catch (e) {
+        console.error("failed to load player inputs", e);
+    }
+}
+
+function setupPlayerInputAutoSave() {
+    const tbody = document.getElementById("playerTableBody");
+    if (!tbody) return;
+
+    // 先に前回の入力を復元
+    loadPlayerInputsFromStorage();
+
+    const handler = () => {
+        savePlayerInputsToStorage();
+    };
+
+    // 入力値・選択値が変わったら自動保存
+    tbody.addEventListener("change", handler);
+    tbody.addEventListener("input", handler);
+}
 
 // =====================
 // JSON 出力 / 読み込み（10人入力）
@@ -2119,10 +2363,12 @@ for (let prefIndex = 1; prefIndex <= 5; prefIndex++) {
 
     refreshPlayerRegistryTable();
     updatePlayerRegistrySelects();
+    savePlayerRegistryToStorage();
 
     message.textContent = successMessage;
     message.classList.add("success");
 }
+
 
 
 
@@ -2222,7 +2468,9 @@ tr.appendChild(tdNote);
             playerRegistry.splice(index, 1);
             refreshPlayerRegistryTable();
             updatePlayerRegistrySelects();
+            savePlayerRegistryToStorage();
         });
+
         tdActions.appendChild(btnDelete);
 
         tr.appendChild(tdActions);
@@ -2441,6 +2689,48 @@ function downloadJsonFile(filename, data) {
 }
 
 
+// =====================
+// プレイヤーリスト（登録済みプレイヤー）の保存 / 復元（localStorage）
+// =====================
+
+const STORAGE_KEY_PLAYER_REGISTRY = "lolTeamTool_playerRegistry_v1";
+
+function savePlayerRegistryToStorage() {
+    try {
+        localStorage.setItem(
+            STORAGE_KEY_PLAYER_REGISTRY,
+            JSON.stringify(playerRegistry)
+        );
+    } catch (e) {
+        console.error("failed to save player registry", e);
+    }
+}
+
+function restorePlayerRegistryFromStorage() {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY_PLAYER_REGISTRY);
+        if (!raw) return;
+
+        const data = JSON.parse(raw);
+        if (!Array.isArray(data)) return;
+
+        playerRegistry = data.map(raw => ({
+            name: raw.name ?? "",
+            note: raw.note ?? "",
+            laneRanks: raw.laneRanks ? { ...raw.laneRanks } : {},
+            lanePrefs: Array.isArray(raw.lanePrefs) ? [...raw.lanePrefs] : []
+        }));
+    } catch (e) {
+        console.error("failed to load player registry", e);
+        return;
+    }
+
+    refreshPlayerRegistryTable();
+    updatePlayerRegistrySelects();
+}
+
+
+
 // 共通: JSON文字列からプレイヤーリストを復元
 function loadPlayerRegistryFromJsonText(text) {
     const message = document.getElementById("message");
@@ -2477,11 +2767,13 @@ function loadPlayerRegistryFromJsonText(text) {
 
         refreshPlayerRegistryTable();
         updatePlayerRegistrySelects();
+        savePlayerRegistryToStorage();
 
         if (message) {
             message.textContent = "プレイヤーリストをJSONから読み込みました。";
             message.classList.add("success");
         }
+
     } catch (e) {
         console.error(e);
         if (message) {
